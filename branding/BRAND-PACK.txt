@@ -1,0 +1,12 @@
+BMT Remote | Brand Pack v1
+
+Concept: BMT letter B with connected remote displays.
+Colours: Navy #07172C, Blue #078CF8, Cyan #24B5FF, White #FFFFFF.
+
+App icon: SVG, PNG 16-1024 px, Windows ICO, macOS ICNS.
+Logos: dark-background and light-background SVG/PNG.
+Symbol: standalone SVG and PNG.
+
+SVG wordmark uses DejaVu Sans/Arial fallback and remains editable.
+This is original vector artwork inspired by the approved concept, not a pixel-exact extraction of the initial mockup.
+Verify branding and any RustDesk attribution/licensing obligations before distributing a rebranded client.

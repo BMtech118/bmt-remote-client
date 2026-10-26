@@ -63,5 +63,13 @@ edit("src/platform/windows.rs", [
 edit("flutter/macos/Runner/Info.plist", [
     ("<string>rustdesk</string>", "<string>bmtremote</string>"),
 ])
+# build.py hardcodes the Flutter macOS bundle as RustDesk.app; ours is "BMT Remote.app".
+edit("build.py", [
+    ("system2('cp -rf ../target/release/service ./build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/')",
+     "system2('cp -rf ../target/release/service \"./build/macos/Build/Products/Release/BMT Remote.app/Contents/MacOS/\"')"),
+    ('--icon RustDesk.app 200 190 --hide-extension RustDesk.app rustdesk.dmg ./build/macos/Build/Products/Release/RustDesk.app")',
+     '--icon \\"BMT Remote.app\\" 200 190 --hide-extension \\"BMT Remote.app\\" rustdesk.dmg \\"./build/macos/Build/Products/Release/BMT Remote.app\\"")'),
+    ('create-dmg --volname \\"RustDesk Installer\\"', 'create-dmg --volname \\"BMT Remote\\"'),
+])
 PY
 echo "branding applied"

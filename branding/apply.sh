@@ -71,5 +71,25 @@ edit("build.py", [
      '--icon \\"BMT Remote.app\\" 200 190 --hide-extension \\"BMT Remote.app\\" rustdesk.dmg \\"./build/macos/Build/Products/Release/BMT Remote.app\\"")'),
     ('create-dmg --volname \\"RustDesk Installer\\"', 'create-dmg --volname \\"BMT Remote\\"'),
 ])
+# macOS 12 minimum: current Xcode refuses older deployment targets.
+edit("flutter/macos/Podfile", [
+    ("platform :osx, '10.14'", "platform :osx, '12.0'"),
+    ("""    flutter_additional_macos_build_settings(target)
+  end""", """    flutter_additional_macos_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '12.0'
+    end
+  end"""),
+])
+p = "flutter/macos/Runner.xcodeproj/project.pbxproj"
+s = open(p, encoding="utf-8").read()
+s = re.sub(r"MACOSX_DEPLOYMENT_TARGET = 10\.\d+;", "MACOSX_DEPLOYMENT_TARGET = 12.0;", s)
+open(p, "w", encoding="utf-8").write(s)
+# Our own macOS bundle ID (the Xcode project overrides AppInfo.xcconfig), so
+# macOS never treats BMT Remote as RustDesk, permissions included.
+p = "flutter/macos/Runner.xcodeproj/project.pbxproj"
+s = open(p, encoding="utf-8").read().replace("PRODUCT_BUNDLE_IDENTIFIER = com.carriez.rustdesk;", "PRODUCT_BUNDLE_IDENTIFIER = uk.co.bmtech.remote;")
+open(p, "w", encoding="utf-8").write(s)
+edit("flutter/macos/Runner/Info.plist", [("<string>com.carriez.rustdesk</string>", "<string>uk.co.bmtech.remote</string>")])
 PY
 echo "branding applied"

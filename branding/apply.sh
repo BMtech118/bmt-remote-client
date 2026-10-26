@@ -27,6 +27,8 @@ import re
 def edit(path, pairs):
     s = open(path, encoding="utf-8").read()
     for a, b in pairs:
+        if b in s and a not in s:
+            continue  # already applied
         if a not in s:
             raise SystemExit(f"{path}: not found: {a}")
         s = s.replace(a, b)
@@ -49,6 +51,17 @@ edit("flutter/macos/Runner/Configs/AppInfo.xcconfig", [
     ("PRODUCT_NAME = RustDesk", "PRODUCT_NAME = BMT Remote"),
     ("PRODUCT_BUNDLE_IDENTIFIER = com.carriez.flutterHbb", "PRODUCT_BUNDLE_IDENTIFIER = uk.co.bmtech.remote"),
     ("PRODUCT_COPYRIGHT = Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved.", f"PRODUCT_COPYRIGHT = {notice}"),
+])
+# Link scheme: the app name has a space, so the scheme drops it (bmtremote://);
+# "bmt remote://" is not a valid URL and one-click connect links would fail.
+edit("src/common.rs", [
+    ('format!("{}://", get_app_name().to_lowercase())', 'format!("{}://", get_app_name().to_lowercase().replace(' ', ""))'),
+])
+edit("src/platform/windows.rs", [
+    ("let ext = app_name.to_lowercase();", "let ext = app_name.to_lowercase().replace(' ', \"\");"),
+])
+edit("flutter/macos/Runner/Info.plist", [
+    ("<string>rustdesk</string>", "<string>bmtremote</string>"),
 ])
 PY
 echo "branding applied"

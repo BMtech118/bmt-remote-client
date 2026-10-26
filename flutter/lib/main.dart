@@ -29,6 +29,7 @@ import 'mobile/pages/home_page.dart';
 import 'mobile/pages/server_page.dart';
 import 'mobile/widgets/deploy_dialog.dart';
 import 'models/platform_model.dart';
+import 'bmt_checkin.dart';
 
 /// Basic window and launch properties.
 int? kWindowId;
@@ -142,6 +143,9 @@ void runMainApp(bool startService) async {
   await Future.wait([gFFI.abModel.loadCache(), gFFI.groupModel.loadCache()]);
   gFFI.userModel.refreshCurrentUser();
   runApp(App());
+  // BMT Remote: a Windows download named for a support session checks in.
+  final bmtCode = sessionCodeFromLaunch();
+  if (bmtCode != null) bmtCheckIn(bmtCode);
 
   bool? alwaysOnTop;
   if (isDesktop) {

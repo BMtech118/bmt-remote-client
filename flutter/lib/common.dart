@@ -46,6 +46,7 @@ import 'package:flutter_hbb/native/win32.dart'
 import 'package:flutter_hbb/native/common.dart'
     if (dart.library.html) 'package:flutter_hbb/web/common.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
+import 'bmt_checkin.dart';
 
 final globalKey = GlobalKey<NavigatorState>();
 final navigationBarKey = GlobalKey();
@@ -2254,6 +2255,16 @@ setEnvTerminalAdmin() {
 
 // uri link handler
 bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
+  // BMT Remote: a session page's "Open BMT Remote" link checks this computer in;
+  // the app then opens normally so the customer can accept the connection.
+  final bmtCode = sessionCodeFromUri(uri ??
+      (uriString != null
+          ? Uri.tryParse(uriString)
+          : (cmdArgs != null && cmdArgs.isNotEmpty ? Uri.tryParse(cmdArgs[0]) : null)));
+  if (bmtCode != null) {
+    bmtCheckIn(bmtCode);
+    return false;
+  }
   List<String>? args;
   if (cmdArgs != null && cmdArgs.isNotEmpty) {
     args = cmdArgs;

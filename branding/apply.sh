@@ -55,7 +55,7 @@ edit("flutter/macos/Runner/Configs/AppInfo.xcconfig", [
 # Link scheme: the app name has a space, so the scheme drops it (bmtremote://);
 # "bmt remote://" is not a valid URL and one-click connect links would fail.
 edit("src/common.rs", [
-    ('format!("{}://", get_app_name().to_lowercase())', 'format!("{}://", get_app_name().to_lowercase().replace(' ', ""))'),
+    ('format!("{}://", get_app_name().to_lowercase())', "format!(\"{}://\", get_app_name().to_lowercase().replace(' ', \"\"))"),
 ])
 edit("src/platform/windows.rs", [
     ("let ext = app_name.to_lowercase();", "let ext = app_name.to_lowercase().replace(' ', \"\");"),

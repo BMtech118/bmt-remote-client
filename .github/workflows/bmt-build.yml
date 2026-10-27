@@ -197,7 +197,12 @@ jobs:
           flutter precache --windows
           Invoke-WebRequest -Uri https://github.com/rustdesk/engine/releases/download/main/windows-x64-release.zip -OutFile windows-x64-release.zip
           Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
-          mv -Force windows-x64-release/*  C:/hostedtoolcache/windows/flutter/stable-${{ env.FLUTTER_VERSION }}-x64/bin/cache/artifacts/engine/windows-x64-release/
+          # Derive the Flutter root from the tool itself so this works on any runner
+          # (GitHub-hosted uses C:\hostedtoolcache, BM-HOST-02 uses its own cache path).
+          $flutterBin = Split-Path (Get-Command flutter).Source
+          $engineDest = Join-Path (Split-Path $flutterBin) "bin\cache\artifacts\engine\windows-x64-release"
+          New-Item -ItemType Directory -Force $engineDest | Out-Null
+          Move-Item -Force windows-x64-release/* $engineDest
 
       - name: Patch flutter
         # x64 stays on Flutter 3.24.5, which needs the dropdown filter patch.

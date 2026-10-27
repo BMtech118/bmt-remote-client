@@ -11,6 +11,8 @@ pub use platform::{
 #[cfg(not(any(target_os = "ios")))]
 /// cbindgen:ignore
 mod server;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod bmt_enrol;
 #[cfg(not(any(target_os = "ios")))]
 pub use self::server::*;
 mod client;

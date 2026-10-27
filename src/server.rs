@@ -700,6 +700,8 @@ pub async fn start_server(is_server: bool, no_server: bool) {
             // cold probe, which is what happened before the warm existed.
             log::warn!("drm: could not spawn the availability warm ({err}); skipping it");
         }
+        // BMT Remote: unattended enrolment, when an enrolment token is set.
+        crate::bmt_enrol::start();
         input_service::fix_key_down_timeout_loop();
         #[cfg(target_os = "linux")]
         if input_service::wayland_use_uinput() {

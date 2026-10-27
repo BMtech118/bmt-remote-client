@@ -11,6 +11,11 @@ on:
       upload-tag:
         type: string
         default: "nightly"
+      platforms:
+        description: "What to build (the Intel Mac build alone takes over an hour)"
+        type: choice
+        options: [all, windows, mac]
+        default: all
 
 # NOTE: F-Droid builder script 'flutter/build_fdroid.sh' reads environment
 # variables from this workflow!
@@ -61,6 +66,8 @@ permissions:
 jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
+    with:
+      default-bridge-only: true
 
   build-RustDeskTempTopMostWindow:
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
@@ -82,6 +89,7 @@ jobs:
   build-for-windows-flutter:
     name: ${{ matrix.job.target }}
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
+    if: ${{ inputs.platforms != 'mac' }}
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
@@ -428,6 +436,7 @@ jobs:
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
+    if: ${{ inputs.platforms != 'windows' }}
     strategy:
       fail-fast: false
       matrix:

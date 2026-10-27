@@ -1083,6 +1083,13 @@ pub fn get_app_name() -> String {
     hbb_common::config::APP_NAME.read().unwrap().clone()
 }
 
+// The customer-visible product name (window title, banner). May contain spaces,
+// unlike get_app_name(), which is the install-safe structural name.
+#[inline]
+pub fn get_app_display_name() -> String {
+    hbb_common::config::APP_DISPLAY_NAME.read().unwrap().clone()
+}
+
 #[inline]
 pub fn is_rustdesk() -> bool {
     hbb_common::config::APP_NAME.read().unwrap().eq("RustDesk")
@@ -1090,7 +1097,12 @@ pub fn is_rustdesk() -> bool {
 
 #[inline]
 pub fn get_uri_prefix() -> String {
-    format!("{}://", get_app_name().to_lowercase().replace(' ', ""))
+    let scheme: String = get_app_name()
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect();
+    format!("{}://", scheme)
 }
 
 #[cfg(target_os = "macos")]

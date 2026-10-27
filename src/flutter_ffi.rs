@@ -1125,6 +1125,10 @@ pub fn main_get_app_name_sync() -> SyncReturn<String> {
     SyncReturn(get_app_name())
 }
 
+pub fn main_get_app_display_name_sync() -> SyncReturn<String> {
+    SyncReturn(crate::common::get_app_display_name())
+}
+
 pub fn main_uri_prefix_sync() -> SyncReturn<String> {
     SyncReturn(crate::get_uri_prefix())
 }

@@ -1363,6 +1363,16 @@ class FfiModel with ChangeNotifier {
         bind.isSupportMultiUiSession(version: _pi.version);
     _pi.username = evt['username'];
     _pi.hostname = evt['hostname'];
+    // BMT Remote: the tab can now show the computer's name, even on a first visit.
+    if (isDesktop || isWebDesktop) {
+      final label = getDesktopTabLabel(peerId,
+          bind.mainGetPeerOptionSync(id: peerId, key: 'alias'),
+          hostname: _pi.hostname);
+      final rxTabLabel = PeerStringOption.find(peerId, 'tabLabel');
+      if (rxTabLabel.value != label) {
+        rxTabLabel.value = label;
+      }
+    }
     _pi.platform = evt['platform'];
     _pi.sasEnabled = evt['sas_enabled'] == 'true';
     final currentDisplay = int.parse(evt['current_display']);

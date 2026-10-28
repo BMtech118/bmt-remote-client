@@ -10,6 +10,13 @@
 //! from the console, or a new token), a fresh password is made and reported.
 //!
 //! Runs only in the installed service.
+//!
+//! The same service also runs support sessions where the customer accepted
+//! at the start: the session download, run as administrator, installs BMT
+//! Remote and sets `bmt-session-code`. The service then takes a random access
+//! password, sends it with its session check-in so the technician connects
+//! without a prompt (also after a restart), and uninstalls itself when the
+//! technician ends the session.
 
 use hbb_common::{
     config::Config,
@@ -23,6 +30,12 @@ const ENROL_URL: &str = "https://remote.bmtech.co.uk/api/enrol";
 const OPT_TOKEN: &str = "bmt-enrol-token";
 /// The token this machine last enrolled with; a different token re-enrols.
 const OPT_ENROLLED: &str = "bmt-enrolled-token";
+
+const CHECKIN_URL: &str = "https://remote.bmtech.co.uk/api/checkin";
+/// Set by the session download after it installs BMT Remote for a session.
+pub const OPT_SESSION: &str = "bmt-session-code";
+/// The session code whose access password the server has.
+const OPT_SESSION_REPORTED: &str = "bmt-session-reported";
 
 pub fn start() {
     if !crate::platform::is_installed() {
@@ -48,7 +61,97 @@ async fn run() {
                 log::warn!("bmt enrol: {e}");
             }
         }
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        let code = Config::get_option(OPT_SESSION);
+        let mut wait = 60;
+        if !code.trim().is_empty() {
+            match session_tick(code.trim()).await {
+                Ok(()) => {}
+                Err(e) => {
+                    log::warn!("bmt session: {e}");
+                    // Not reported yet (just installed, or the network is still
+                    // coming up after a restart): try again soon.
+                    wait = 10;
+                }
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(wait)).await;
+    }
+}
+
+/// One support-session check-in. The first one after install sends the
+/// access password; later ones are the heartbeat the console shows as
+/// "Ready to connect".
+async fn session_tick(code: &str) -> Result<(), String> {
+    let id = Config::get_id();
+    if id.is_empty() {
+        return Err("no ID yet".into());
+    }
+    let mut body = serde_json::json!({ "code": code, "id": id, "hb": 1 });
+    let reporting = Config::get_option(OPT_SESSION_REPORTED) != code;
+    if reporting {
+        let password: String = OsRng
+            .sample_iter(&Alphanumeric)
+            .take(24)
+            .map(char::from)
+            .collect();
+        if !Config::set_permanent_password(&password) {
+            return Err("could not set the access password".into());
+        }
+        Config::set_option("approve-mode".into(), "password".into());
+        Config::set_option(
+            "verification-method".into(),
+            "use-permanent-password".into(),
+        );
+        body["password"] = password.into();
+    }
+    let status = crate::common::post_request_with_status(
+        CHECKIN_URL.into(),
+        body.to_string(),
+        "Content-Type: application/json",
+    )
+    .await
+    .map(|(status, _)| status)
+    .map_err(|e| e.to_string())?;
+    match status {
+        200 => {
+            if reporting {
+                Config::set_option(OPT_SESSION_REPORTED.into(), code.into());
+                log::info!("bmt session: {code} ready on {id}");
+            }
+            Ok(())
+        }
+        // The technician ended the session (or it expired): remove BMT Remote.
+        404 | 410 => {
+            log::info!("bmt session: {code} ended, uninstalling");
+            end_session();
+            Ok(())
+        }
+        s => Err(format!("check-in returned {s}")),
+    }
+}
+
+/// Uninstalls BMT Remote after a support session. The uninstall stops this
+/// service, so it runs as its own detached process.
+fn end_session() {
+    Config::set_option(OPT_SESSION.into(), "".into());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+        match std::env::current_exe() {
+            Ok(exe) => {
+                if let Err(e) = std::process::Command::new(exe)
+                    .arg("--uninstall")
+                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB)
+                    .spawn()
+                {
+                    log::error!("bmt session: could not start the uninstall: {e}");
+                }
+            }
+            Err(e) => log::error!("bmt session: no exe path: {e}"),
+        }
     }
 }
 

@@ -285,6 +285,13 @@ pub fn core_main() -> Option<Vec<String>> {
                     .show()
                     .ok();
                 return None;
+            } else if args[0] == "--bmt-session-install" {
+                // BMT Remote: the support-session download, run as administrator
+                // (the customer's one acceptance), installs BMT Remote for the
+                // session. The service takes it from there and removes itself
+                // when the session ends. Exit code 0 means the service has the
+                // session; anything else and the download carries on as before.
+                std::process::exit(bmt_session_install(args.get(1).map(|s| s.as_str()).unwrap_or("")));
             } else if args[0] == "--uninstall-cert" {
                 #[cfg(windows)]
                 hbb_common::allow_err!(crate::platform::windows::uninstall_cert());
@@ -886,6 +893,41 @@ fn is_user_main_ipc_scope_cli_command(args: &[String]) -> bool {
             | Some("--assign")
             | Some("--deploy")
     )
+}
+
+#[cfg(windows)]
+fn bmt_session_install(code: &str) -> i32 {
+    use crate::platform;
+    let code = code.trim().to_uppercase();
+    if code.len() != 6 || !code.chars().all(|c| "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".contains(c)) {
+        return 2;
+    }
+    if !platform::is_elevated(None).unwrap_or(false) {
+        return 3;
+    }
+    // Already installed (an unattended computer): leave that install alone.
+    if platform::is_installed() {
+        return 4;
+    }
+    let options = platform::get_silent_install_options(None);
+    if let Err(e) = platform::install_me(options, "".to_owned(), true, false) {
+        log::error!("bmt session install failed: {e}");
+        return 5;
+    }
+    let (_, _, _, exe) = platform::windows::get_install_info();
+    let want = format!("'{code}'");
+    for _ in 0..30 {
+        if platform::windows::service_options_contain(&want) {
+            return 0;
+        }
+        hbb_common::allow_err!(platform::windows::run_exe_as_system(
+            &exe,
+            &format!("--option {} {code}", crate::bmt_enrol::OPT_SESSION)
+        ));
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+    log::error!("bmt session install: the service never took the session code");
+    6
 }
 
 #[inline]

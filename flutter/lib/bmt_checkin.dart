@@ -7,10 +7,14 @@
 //    launcher passes that original file name in RUSTDESK_APPNAME.
 //  - Mac (installed): the session page opens bmtremote://bmt-session/<CODE>.
 //
-// After checking in it keeps sending a heartbeat, so the console can say
-// whether the app is still running. On Windows the session app also asks to
-// be reopened at the next sign-in, so a support session survives a reboot;
-// that entry goes when the app is closed or the technician ends the session.
+// On Windows the session download first asks for administrator rights once
+// (the customer's acceptance) and installs BMT Remote for the session; the
+// installed service then checks in, lets the technician connect without
+// further prompts (also after a restart) and uninstalls itself when the
+// session ends. If the customer says no, or BMT Remote is already installed,
+// it carries on as a normal session app: after checking in it keeps sending a
+// heartbeat, and it asks to be reopened at the next sign-in so the session
+// survives a reboot; that entry goes when the app is closed or the session ends.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -43,6 +47,35 @@ const _autostartKey = r'HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce';
 const _autostartValue = 'BMTRemoteSession';
 
 bool _sent = false;
+
+/// Starts BMT Remote's side of a support session.
+Future<void> bmtStartSession(String code) async {
+  if (Platform.isWindows && sessionCodeFromLaunch() != null && !bind.mainIsInstalled()) {
+    if (await _installForSession(code)) {
+      // The installed service has the session now; this copy isn't needed.
+      exit(0);
+    }
+  }
+  await bmtCheckIn(code);
+}
+
+/// Runs this app as administrator to install BMT Remote for the session.
+/// True once the installed service has the session code.
+Future<bool> _installForSession(String code) async {
+  final exe = Platform.resolvedExecutable.replaceAll("'", "''");
+  try {
+    final res = await Process.run('powershell', [
+      '-NoProfile',
+      '-WindowStyle',
+      'Hidden',
+      '-Command',
+      "try { \$p = Start-Process -FilePath '$exe' -ArgumentList '--bmt-session-install','$code' -Verb RunAs -Wait -PassThru; exit \$p.ExitCode } catch { exit 99 }",
+    ]);
+    return res.exitCode == 0;
+  } catch (_) {
+    return false;
+  }
+}
 Timer? _heartbeat;
 
 Future<http.Response> _post(String code, String id) => http

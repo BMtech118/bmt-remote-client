@@ -370,9 +370,15 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           sed -i '/dpiAware/d' res/manifest.xml
+          # The download runs its payload by name, and Windows shows that name in the
+          # UAC prompt (the build is unsigned), so pack it as BMT-Remote.exe. A copy,
+          # because the MSI steps below expect ./rustdesk/rustdesk.exe.
+          rm -rf ./rustdesk-portable
+          cp -r ./rustdesk ./rustdesk-portable
+          mv ./rustdesk-portable/rustdesk.exe ./rustdesk-portable/BMT-Remote.exe
           pushd ./libs/portable
           pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
+          python3 ./generate.py -f ../../rustdesk-portable/ -o . -e ../../rustdesk-portable/BMT-Remote.exe
           popd
           mkdir -p ./SignOutput
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe

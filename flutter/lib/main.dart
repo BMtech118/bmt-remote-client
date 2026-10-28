@@ -145,7 +145,7 @@ void runMainApp(bool startService) async {
   runApp(App());
   // BMT Remote: a Windows download named for a support session checks in.
   final bmtCode = sessionCodeFromLaunch();
-  if (bmtCode != null) bmtCheckIn(bmtCode);
+  if (bmtCode != null) bmtStartSession(bmtCode);
 
   bool? alwaysOnTop;
   if (isDesktop) {

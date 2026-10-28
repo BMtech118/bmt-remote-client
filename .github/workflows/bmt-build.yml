@@ -213,7 +213,13 @@ jobs:
           cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
           cd $(dirname $(dirname $(which flutter)))
           if [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]]; then
-            git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+            # The self-hosted runner keeps the Flutter SDK between builds, so the
+            # patch may already be applied. Only apply it when it would apply cleanly.
+            if git apply --check flutter_3.24.4_dropdown_menu_enableFilter.diff 2>/dev/null; then
+              git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+            else
+              echo "flutter dropdown patch already applied, skipping"
+            fi
           fi
 
       - name: Patch RustDesk sources for Flutter 3.44 (arm64)

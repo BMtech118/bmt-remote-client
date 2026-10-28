@@ -124,6 +124,10 @@ jobs:
       - name: Clean all but the compiled output
         if: runner.environment != 'github-hosted'
         shell: bash
+        env:
+          # Git Bash rewrites "/target" to "C:/Program Files/Git/target", which
+          # silently dropped these excludes and wiped the compiled output.
+          MSYS_NO_PATHCONV: "1"
         run: |
           git reset --hard -q
           git clean -ffdxq -e /target -e /flutter/build -e /flutter/.dart_tool
@@ -248,7 +252,9 @@ jobs:
         with:
           vcpkgDirectory: C:\vcpkg
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-          doNotCache: false
+          # BM-HOST-02 keeps C:\vcpkg on disk; uploading it to the Actions cache
+          # cost ~23 min a run.
+          doNotCache: ${{ runner.environment != 'github-hosted' }}
 
       - name: Install vcpkg dependencies
         env:

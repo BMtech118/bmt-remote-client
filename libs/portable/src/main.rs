@@ -245,6 +245,8 @@ fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
     }
 
     cmd.env(APPNAME_RUNTIME_ENV_KEY, exe_name);
+    // BMT Remote: the session app reopens this launcher after a reboot.
+    cmd.env("BMT_LAUNCHER_PATH", &exe);
     if use_null_stdio() {
         cmd.stdin(Stdio::null())
             .stdout(Stdio::null())

@@ -61,6 +61,10 @@ class ChatModel with ChangeNotifier {
 
   bool isConnManager = false;
 
+  // BMT Remote: the technician's chat is a docked panel in the remote window.
+  final RxBool bmtDockOpen = false.obs;
+  bool get _bmtDocked => isDesktop && !isConnManager;
+
   RxBool isWindowFocus = true.obs;
   BlockableOverlayState _blockableOverlayState = BlockableOverlayState();
   final Rx<VoiceCallStatus> _voiceCallStatus = Rx(VoiceCallStatus.notStarted);
@@ -195,6 +199,11 @@ class ChatModel with ChangeNotifier {
   }
 
   showChatWindowOverlay({Offset? chatInitPos}) {
+    if (_bmtDocked) {
+      bmtDockOpen.value = true;
+      requestChatInputFocus();
+      return;
+    }
     if (chatWindowOverlayEntry != null) return;
     isWindowFocus.value = true;
     _blockableOverlayState.setMiddleBlocked(true);
@@ -227,6 +236,10 @@ class ChatModel with ChangeNotifier {
   }
 
   hideChatWindowOverlay() {
+    if (_bmtDocked) {
+      bmtDockOpen.value = false;
+      return;
+    }
     if (chatWindowOverlayEntry != null) {
       _blockableOverlayState.setMiddleBlocked(false);
       chatWindowOverlayEntry!.remove();
@@ -235,8 +248,9 @@ class ChatModel with ChangeNotifier {
     }
   }
 
-  _isChatOverlayHide() =>
-      ((!(isDesktop || isWebDesktop) && chatIconOverlayEntry == null) ||
+  _isChatOverlayHide() => _bmtDocked
+      ? !bmtDockOpen.value
+      : ((!(isDesktop || isWebDesktop) && chatIconOverlayEntry == null) ||
           chatWindowOverlayEntry == null);
 
   toggleChatOverlay({Offset? chatInitPos}) {

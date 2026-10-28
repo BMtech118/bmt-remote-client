@@ -22,6 +22,7 @@ import '../../utils/image.dart';
 import '../widgets/remote_toolbar.dart';
 import '../widgets/kb_layout_type_chooser.dart';
 import '../widgets/tabbar_widget.dart';
+import '../widgets/bmt_chat_panel.dart';
 import 'macos_full_screen_focus_recovery.dart';
 
 import 'package:flutter_hbb/native/custom_cursor.dart'
@@ -783,6 +784,18 @@ class _RemotePageState extends State<RemotePage>
       );
     }
 
+    // BMT Remote: the remote screen makes room for the docked chat panel.
+    withChatPanel() => Row(children: [
+          Expanded(child: bodyWidget()),
+          Obx(() => _ffi.chatModel.bmtDockOpen.isTrue
+              ? BmtChatPanel(
+                  chatModel: _ffi.chatModel,
+                  title: getDesktopTabLabel(widget.id,
+                      bind.mainGetPeerOptionSync(id: widget.id, key: 'alias'),
+                      hostname: _ffi.ffiModel.pi.hostname))
+              : const SizedBox.shrink()),
+        ]);
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
       body: Obx(() {
@@ -802,13 +815,13 @@ class _RemotePageState extends State<RemotePage>
           }
           // Block the whole `bodyWidget()` when dialog shows.
           return BlockableOverlay(
-            underlying: bodyWidget(),
+            underlying: withChatPanel(),
             state: _blockableOverlayState,
           );
         } else {
           // `_blockableOverlayState` is not recreated here.
           // The toolbar's block state won't work properly when reconnecting, but that's okay.
-          return bodyWidget();
+          return withChatPanel();
         }
       }),
     );

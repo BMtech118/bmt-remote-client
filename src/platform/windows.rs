@@ -2409,26 +2409,6 @@ pub fn run_as_system(arg: &str) -> ResultType<()> {
     Ok(())
 }
 
-/// BMT Remote: run another executable (the installed copy) as SYSTEM.
-pub fn run_exe_as_system(exe: &str, arg: &str) -> ResultType<()> {
-    if impersonate_system::run_as_system(exe, arg).is_err() {
-        bail!(format!("Failed to run {} as system", exe));
-    }
-    Ok(())
-}
-
-/// BMT Remote: the installed service's own options file, readable by an
-/// administrator, so a setup step can confirm an option reached the service.
-pub fn service_options_contain(text: &str) -> bool {
-    let app = crate::get_app_name();
-    [
-        format!("C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\{app}\\config\\{app}2.toml"),
-        format!("C:\\Windows\\System32\\config\\systemprofile\\AppData\\Roaming\\{app}\\config\\{app}2.toml"),
-    ]
-    .iter()
-    .any(|p| std::fs::read_to_string(p).map_or(false, |s| s.contains(text)))
-}
-
 pub fn elevate_or_run_as_system(is_setup: bool, is_elevate: bool, is_run_as_system: bool) {
     // avoid possible run recursively due to failed run.
     log::info!(

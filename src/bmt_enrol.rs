@@ -37,6 +37,38 @@ pub const OPT_SESSION: &str = "bmt-session-code";
 /// The session code whose access password the server has.
 const OPT_SESSION_REPORTED: &str = "bmt-session-reported";
 
+/// Where the session download leaves the session code for the service.
+#[cfg(windows)]
+fn session_file() -> std::path::PathBuf {
+    let base = std::env::var("ProgramData").unwrap_or_else(|_| "C:\\ProgramData".into());
+    std::path::Path::new(&base)
+        .join(crate::get_app_name())
+        .join("bmt-session-code")
+}
+
+#[cfg(windows)]
+pub fn write_session_file(code: &str) -> Result<(), String> {
+    let path = session_file();
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, code).map_err(|e| e.to_string())
+}
+
+/// A session code left by the session download, taken once.
+fn take_session_file() -> Option<String> {
+    #[cfg(windows)]
+    {
+        let path = session_file();
+        let code = std::fs::read_to_string(&path).ok()?.trim().to_uppercase();
+        std::fs::remove_file(&path).ok();
+        if code.len() == 6 {
+            return Some(code);
+        }
+    }
+    None
+}
+
 pub fn start() {
     if !crate::platform::is_installed() {
         return;
@@ -60,6 +92,9 @@ async fn run() {
             if let Err(e) = tick(token.trim()).await {
                 log::warn!("bmt enrol: {e}");
             }
+        }
+        if let Some(code) = take_session_file() {
+            Config::set_option(OPT_SESSION.into(), code);
         }
         let code = Config::get_option(OPT_SESSION);
         let mut wait = 60;

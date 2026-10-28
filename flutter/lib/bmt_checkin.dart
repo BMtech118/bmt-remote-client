@@ -60,7 +60,9 @@ Future<void> bmtStartSession(String code) async {
 }
 
 /// Runs this app as administrator to install BMT Remote for the session.
-/// True once the installed service has the session code.
+/// True once BMT Remote is installed. The installer can't be waited on (the
+/// install replaces running copies of BMT Remote), so this watches for the
+/// install instead.
 Future<bool> _installForSession(String code) async {
   final exe = Platform.resolvedExecutable.replaceAll("'", "''");
   try {
@@ -69,12 +71,18 @@ Future<bool> _installForSession(String code) async {
       '-WindowStyle',
       'Hidden',
       '-Command',
-      "try { \$p = Start-Process -FilePath '$exe' -ArgumentList '--bmt-session-install','$code' -Verb RunAs -Wait -PassThru; exit \$p.ExitCode } catch { exit 99 }",
+      "try { Start-Process -FilePath '$exe' -ArgumentList '--bmt-session-install','$code' -Verb RunAs; exit 0 } catch { exit 99 }",
     ]);
-    return res.exitCode == 0;
+    // The customer said no to the administrator prompt.
+    if (res.exitCode != 0) return false;
   } catch (_) {
     return false;
   }
+  for (var i = 0; i < 60; i++) {
+    await Future.delayed(const Duration(seconds: 2));
+    if (bind.mainIsInstalled()) return true;
+  }
+  return false;
 }
 Timer? _heartbeat;
 

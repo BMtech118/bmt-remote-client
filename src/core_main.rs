@@ -909,25 +909,18 @@ fn bmt_session_install(code: &str) -> i32 {
     if platform::is_installed() {
         return 4;
     }
+    // The installed service picks the session up from this file. Written first:
+    // the install replaces running copies of BMT Remote, this one included.
+    if let Err(e) = crate::bmt_enrol::write_session_file(&code) {
+        log::error!("bmt session install: {e}");
+        return 6;
+    }
     let options = platform::get_silent_install_options(None);
     if let Err(e) = platform::install_me(options, "".to_owned(), true, false) {
         log::error!("bmt session install failed: {e}");
         return 5;
     }
-    let (_, _, _, exe) = platform::windows::get_install_info();
-    let want = format!("'{code}'");
-    for _ in 0..30 {
-        if platform::windows::service_options_contain(&want) {
-            return 0;
-        }
-        hbb_common::allow_err!(platform::windows::run_exe_as_system(
-            &exe,
-            &format!("--option {} {code}", crate::bmt_enrol::OPT_SESSION)
-        ));
-        std::thread::sleep(std::time::Duration::from_secs(2));
-    }
-    log::error!("bmt session install: the service never took the session code");
-    6
+    0
 }
 
 #[inline]

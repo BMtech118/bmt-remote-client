@@ -403,6 +403,8 @@ void runBmtChatWindow(String token) async {
   final windowOptions = getHiddenTitleBarWindowOptions(
       size: const Size(380, 500), center: true, alwaysOnTop: true);
   windowManager.waitUntilReadyToShow(windowOptions, () async {
+    // Its own title, so later BMT Remote launches aren't handed to this window.
+    await windowManager.setTitle('BMT Remote messages');
     await windowManager.show();
     await windowManager.focus();
     await windowManager.setOpacity(1);

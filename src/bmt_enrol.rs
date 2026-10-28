@@ -271,8 +271,7 @@ fn open_chat_if_new(body: &str) {
     }
     #[cfg(windows)]
     match crate::platform::run_as_user(vec!["--bmt-chat", token]) {
-        Ok(Some(_)) => Config::set_option(OPT_CHAT_SEEN.into(), last.to_string()),
-        Ok(None) => {}
+        Ok(_) => Config::set_option(OPT_CHAT_SEEN.into(), last.to_string()),
         Err(e) => log::warn!("bmt chat: could not open the chat window: {e}"),
     }
 }

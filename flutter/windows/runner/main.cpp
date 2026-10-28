@@ -16,7 +16,8 @@ typedef void (*FUNC_RUSTDESK_FREE_ARGS)( char**, int);
 typedef int (*FUNC_RUSTDESK_GET_APP_NAME)(wchar_t*, int);
 typedef int (*FUNC_RUSTDESK_IS_DISABLE_INSTALLATION)();
 /// Note: `--server`, `--service` are already handled in [core_main.rs].
-const std::vector<std::string> parameters_white_list = {"--install", "--cm"};
+// BMT Remote: "--bmt-chat" opens the customer's chat window beside the app.
+const std::vector<std::string> parameters_white_list = {"--install", "--cm", "--bmt-chat"};
 
 const wchar_t* getWindowClassName();
 

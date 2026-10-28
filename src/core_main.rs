@@ -292,6 +292,10 @@ pub fn core_main() -> Option<Vec<String>> {
                 // when the session ends. Exit code 0 means the service has the
                 // session; anything else and the download carries on as before.
                 std::process::exit(bmt_session_install(args.get(1).map(|s| s.as_str()).unwrap_or("")));
+            } else if args[0] == "--bmt-chat" {
+                if crate::bmt_enrol::chat_window_running() {
+                    return None;
+                }
             } else if args[0] == "--uninstall-cert" {
                 #[cfg(windows)]
                 hbb_common::allow_err!(crate::platform::windows::uninstall_cert());

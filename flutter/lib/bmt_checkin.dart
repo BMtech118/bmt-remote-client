@@ -21,6 +21,8 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'bmt_portal_chat.dart';
+import 'common.dart' show globalKey;
 import 'models/platform_model.dart';
 
 const _checkinUrl = 'https://remote.bmtech.co.uk/api/checkin';
@@ -105,6 +107,7 @@ Future<void> bmtCheckIn(String code) async {
         final res = await _post(code, id);
         if (res.statusCode == 200) {
           _sent = true;
+          _watchChat(res.body);
           await _setAutostart();
           _heartbeat = Timer.periodic(const Duration(seconds: 60), (_) => _beat(code, id));
           return;
@@ -116,6 +119,16 @@ Future<void> bmtCheckIn(String code) async {
     } catch (_) {}
     await Future.delayed(const Duration(seconds: 5));
   }
+}
+
+/// Portal messages for this session pop up over the app.
+void _watchChat(String body) {
+  try {
+    final chat = jsonDecode(body)['chat'];
+    if (chat is Map && chat['t'] is String && BmtPortalChatWatcher.supported) {
+      BmtPortalChatWatcher.start(chat['t'], (chat['last'] as int?) ?? 0, globalKey);
+    }
+  } catch (_) {}
 }
 
 Future<void> _beat(String code, String id) async {

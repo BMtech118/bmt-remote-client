@@ -30,6 +30,7 @@ import 'mobile/pages/server_page.dart';
 import 'mobile/widgets/deploy_dialog.dart';
 import 'models/platform_model.dart';
 import 'bmt_checkin.dart';
+import 'bmt_portal_chat.dart';
 
 /// Basic window and launch properties.
 int? kWindowId;
@@ -107,6 +108,9 @@ Future<void> main(List<String> args) async {
     runConnectionManagerScreen();
   } else if (args.contains('--install')) {
     runInstallPage();
+  } else if (args.length > 1 && args.first == '--bmt-chat') {
+    await windowManager.ensureInitialized();
+    runBmtChatWindow(args[1]);
   } else {
     desktopType = DesktopType.main;
     await windowManager.ensureInitialized();
@@ -386,6 +390,23 @@ void _runApp(
       },
     ),
   ));
+}
+
+/// BMT Remote: the chat window an installed BMT Remote opens for the signed-in
+/// user when a technician messages them from the console.
+void runBmtChatWindow(String token) async {
+  await initEnv(kAppTypeMain);
+  _runApp(
+      '',
+      BmtPortalChat(token: token, onClose: () => windowManager.close()),
+      ThemeMode.light);
+  final windowOptions = getHiddenTitleBarWindowOptions(
+      size: const Size(380, 500), center: true, alwaysOnTop: true);
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+    await windowManager.setOpacity(1);
+  });
 }
 
 void runInstallPage() async {

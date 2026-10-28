@@ -139,16 +139,16 @@ async fn session_tick(code: &str) -> Result<(), String> {
         );
         body["password"] = password.into();
     }
-    let status = crate::common::post_request_with_status(
+    let (status, reply) = crate::common::post_request_with_status(
         CHECKIN_URL.into(),
         body.to_string(),
         "Content-Type: application/json",
     )
     .await
-    .map(|(status, _)| status)
     .map_err(|e| e.to_string())?;
     match status {
         200 => {
+            open_chat_if_new(&reply);
             if reporting {
                 Config::set_option(OPT_SESSION_REPORTED.into(), code.into());
                 log::info!("bmt session: {code} ready on {id}");
@@ -197,8 +197,12 @@ async fn tick(token: &str) -> Result<(), String> {
     }
     let enrolled = Config::get_option(OPT_ENROLLED) == token;
     if enrolled {
-        match post(token, &id, None).await? {
-            200 => return Ok(()),
+        let (status, body) = post(token, &id, None).await?;
+        match status {
+            200 => {
+                open_chat_if_new(&body);
+                return Ok(());
+            }
             // The console no longer knows this machine: enrol it again.
             404 => {}
             410 | 403 => return Err("enrolment token revoked".into()),
@@ -218,7 +222,7 @@ async fn tick(token: &str) -> Result<(), String> {
         "verification-method".into(),
         "use-permanent-password".into(),
     );
-    match post(token, &id, Some(&password)).await? {
+    match post(token, &id, Some(&password)).await?.0 {
         200 => {
             Config::set_option(OPT_ENROLLED.into(), token.into());
             log::info!("bmt enrol: enrolled {id}");
@@ -228,7 +232,7 @@ async fn tick(token: &str) -> Result<(), String> {
     }
 }
 
-async fn post(token: &str, id: &str, password: Option<&str>) -> Result<u16, String> {
+async fn post(token: &str, id: &str, password: Option<&str>) -> Result<(u16, String), String> {
     let mut body = serde_json::json!({
         "token": token,
         "id": id,
@@ -246,6 +250,42 @@ async fn post(token: &str, id: &str, password: Option<&str>) -> Result<u16, Stri
         "Content-Type: application/json",
     )
     .await
-    .map(|(status, _)| status)
     .map_err(|e| e.to_string())
+}
+
+/// The last console message this machine has opened the chat window for.
+const OPT_CHAT_SEEN: &str = "bmt-chat-seen";
+
+/// A check-in reply carries the conversation token and the newest technician
+/// message id; a newer message opens the chat window for the signed-in user.
+fn open_chat_if_new(body: &str) {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(body) else {
+        return;
+    };
+    let (Some(token), Some(last)) = (v["chat"]["t"].as_str(), v["chat"]["last"].as_i64()) else {
+        return;
+    };
+    let seen = Config::get_option(OPT_CHAT_SEEN).parse::<i64>().unwrap_or(0);
+    if last <= seen {
+        return;
+    }
+    #[cfg(windows)]
+    match crate::platform::run_as_user(vec!["--bmt-chat", token]) {
+        Ok(Some(_)) => Config::set_option(OPT_CHAT_SEEN.into(), last.to_string()),
+        Ok(None) => {}
+        Err(e) => log::warn!("bmt chat: could not open the chat window: {e}"),
+    }
+}
+
+/// True if this user's chat window is already open, so a second launch quits.
+#[cfg(windows)]
+pub fn chat_window_running() -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    let name: Vec<u16> = std::ffi::OsStr::new("Local\\BMTRemoteChat")
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    // The handle is deliberately kept for the life of the chat window.
+    let handle = unsafe { winapi::um::synchapi::CreateMutexW(std::ptr::null_mut(), 0, name.as_ptr()) };
+    !handle.is_null() && std::io::Error::last_os_error().raw_os_error() == Some(183)
 }

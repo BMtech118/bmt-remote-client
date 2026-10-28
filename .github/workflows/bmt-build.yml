@@ -130,8 +130,12 @@ jobs:
           MSYS_NO_PATHCONV: "1"
         run: |
           git reset --hard -q
-          git clean -ffdxq -e /target -e /flutter/build -e /flutter/.dart_tool
+          # src/version.rs is written by build.rs, which Cargo won't rerun while
+          # target/ is kept, so it has to survive with it.
+          git clean -ffdxq -e /target -e /flutter/build -e /flutter/.dart_tool -e /src/version.rs
           git submodule foreach --recursive -q 'git reset --hard -q && git clean -ffdxq'
+          # If it is missing anyway, make Cargo rerun build.rs to write it.
+          [ -f src/version.rs ] || touch build.rs
 
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

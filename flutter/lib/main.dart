@@ -398,10 +398,16 @@ void runBmtChatWindow(String token) async {
   await initEnv(kAppTypeMain);
   _runApp(
       '',
-      BmtPortalChat(token: token, onClose: () => windowManager.close()),
+      BmtPortalChat(
+          token: token,
+          onClose: () => windowManager.close(),
+          onTechMessage: () async {
+            await windowManager.show();
+            await windowManager.focus();
+          }),
       ThemeMode.light);
   final windowOptions = getHiddenTitleBarWindowOptions(
-      size: const Size(380, 500), center: true, alwaysOnTop: true);
+      size: const Size(380, 560), center: true, alwaysOnTop: true);
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     // Its own title, so later BMT Remote launches aren't handed to this window.
     await windowManager.setTitle('BMT Remote messages');

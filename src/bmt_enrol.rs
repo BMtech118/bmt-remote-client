@@ -269,8 +269,19 @@ fn open_chat_if_new(body: &str) {
     if last <= seen {
         return;
     }
+    // Launched visible: Windows applies the launcher's show state to a
+    // program's first window, so a hidden launch would hide the chat.
     #[cfg(windows)]
-    match crate::platform::run_as_user(vec!["--bmt-chat", token]) {
+    match std::env::current_exe()
+        .map_err(|e| e.to_string())
+        .and_then(|exe| {
+            crate::platform::windows::run_exe_in_cur_session(
+                &exe.to_string_lossy(),
+                vec!["--bmt-chat", token],
+                true,
+            )
+            .map_err(|e| e.to_string())
+        }) {
         Ok(_) => Config::set_option(OPT_CHAT_SEEN.into(), last.to_string()),
         Err(e) => log::warn!("bmt chat: could not open the chat window: {e}"),
     }

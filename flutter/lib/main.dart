@@ -408,6 +408,13 @@ void runBmtChatWindow(String token) async {
     await windowManager.show();
     await windowManager.focus();
     await windowManager.setOpacity(1);
+    // Windows can ignore a program's first show request, depending on how it
+    // was started; show again if it is still hidden.
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!await windowManager.isVisible()) {
+      await windowManager.show();
+      await windowManager.focus();
+    }
   });
 }
 

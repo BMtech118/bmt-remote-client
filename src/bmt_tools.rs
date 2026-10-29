@@ -24,6 +24,10 @@ const OPT_KEY: &str = "bmt-agent-key";
 /// Set by bmt_enrol: the enrolment token, and the token this machine enrolled with.
 const OPT_TOKEN: &str = "bmt-enrol-token";
 const OPT_ENROLLED: &str = "bmt-enrolled-token";
+/// Set by the session download: a support-session code. Lets a session machine
+/// use the tools channel (live resources, terminal, screenshot) the same way an
+/// enrolled computer does, authorising by the session code instead of a token.
+const OPT_SESSION: &str = "bmt-session-code";
 const TERM_URL: &str = "wss://remote.bmtech.co.uk/api/agent/term/";
 const MAX_OUTPUT: usize = 6_000_000;
 /// Agent-side WebSocket frames start with one type byte.
@@ -82,20 +86,30 @@ fn agent_key() -> String {
 
 async fn run() {
     loop {
-        let token = Config::get_option(OPT_TOKEN).trim().to_owned();
         let id = Config::get_id();
-        if token.is_empty() || id.is_empty() || Config::get_option(OPT_ENROLLED) != token {
+        let token = Config::get_option(OPT_TOKEN).trim().to_owned();
+        let enrolled = !token.is_empty() && Config::get_option(OPT_ENROLLED) == token;
+        let session = Config::get_option(OPT_SESSION).trim().to_owned();
+        let auth = if enrolled {
+            Auth::Enrolled(token)
+        } else if !session.is_empty() {
+            Auth::Session(session)
+        } else {
             tokio::time::sleep(Duration::from_secs(30)).await;
             continue;
+        };
+        if id.is_empty() {
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            continue;
         }
-        match wait(&token, &id).await {
+        match wait(&auth, &id).await {
             Ok(Some(Job::Terminal { sid, shell, cols, rows })) => {
-                let (token, id) = (token.clone(), id.clone());
+                let (auth, id) = (auth.clone(), id.clone());
                 // Its own thread and runtime: the PTY types aren't Send.
                 let spawned = std::thread::Builder::new().name("bmt-term".into()).spawn(move || {
                     match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                         Ok(rt) => {
-                            if let Err(e) = rt.block_on(terminal(&token, &id, &sid, &shell, cols, rows)) {
+                            if let Err(e) = rt.block_on(terminal(&auth, &id, &sid, &shell, cols, rows)) {
                                 log::warn!("bmt tools: terminal ended: {e}");
                             }
                         }
@@ -113,7 +127,7 @@ async fn run() {
                 let (exit, output, timed_out) = outcome.unwrap_or_else(|e| {
                     (None, format!("BMT Remote could not run this command: {e}"), false)
                 });
-                if let Err(e) = report(&token, &id, cmd.id, exit, &output, timed_out).await {
+                if let Err(e) = report(&auth, &id, cmd.id, exit, &output, timed_out).await {
                     log::warn!("bmt tools: result for {} not sent: {e}", cmd.id);
                 }
             }
@@ -126,14 +140,28 @@ async fn run() {
     }
 }
 
-fn credentials(token: &str, id: &str) -> serde_json::Value {
-    serde_json::json!({ "token": token, "id": id, "key": agent_key() })
+/// How this machine proves itself on the tools channel.
+#[derive(Clone)]
+enum Auth {
+    /// An installed, enrolled computer: its company token.
+    Enrolled(String),
+    /// A machine in a support session: the session code.
+    Session(String),
 }
 
-async fn wait(token: &str, id: &str) -> Result<Option<Job>, String> {
+fn credentials(auth: &Auth, id: &str) -> serde_json::Value {
+    let mut v = serde_json::json!({ "id": id, "key": agent_key() });
+    match auth {
+        Auth::Enrolled(token) => v["token"] = token.clone().into(),
+        Auth::Session(code) => v["session"] = code.clone().into(),
+    }
+    v
+}
+
+async fn wait(auth: &Auth, id: &str) -> Result<Option<Job>, String> {
     let (status, body) = crate::common::post_request_with_status(
         WAIT_URL.into(),
-        credentials(token, id).to_string(),
+        credentials(auth, id).to_string(),
         "Content-Type: application/json",
     )
     .await
@@ -167,14 +195,14 @@ async fn wait(token: &str, id: &str) -> Result<Option<Job>, String> {
 }
 
 async fn report(
-    token: &str,
+    auth: &Auth,
     id: &str,
     cmd: i64,
     exit: Option<i32>,
     output: &str,
     timed_out: bool,
 ) -> Result<(), String> {
-    let mut body = credentials(token, id);
+    let mut body = credentials(auth, id);
     body["cmd"] = cmd.into();
     body["exit"] = exit.into();
     body["output"] = output.into();
@@ -316,7 +344,7 @@ fn execute(shell: &str, script: &str, timeout: u64) -> (Option<i32>, String, boo
 
 /// A live shell for the console: PowerShell or CMD as SYSTEM in a ConPTY,
 /// relayed over a WebSocket. Frames carry a type byte (data or JSON control).
-async fn terminal(token: &str, id: &str, sid: &str, shell: &str, cols: u16, rows: u16) -> Result<(), String> {
+async fn terminal(auth: &Auth, id: &str, sid: &str, shell: &str, cols: u16, rows: u16) -> Result<(), String> {
     use hbb_common::{bytes::Bytes, websocket::WsFramedStream};
     use portable_pty::{CommandBuilder, PtySize};
     use std::io::{Read, Write};
@@ -325,7 +353,7 @@ async fn terminal(token: &str, id: &str, sid: &str, shell: &str, cols: u16, rows
         .await
         .map_err(|e| e.to_string())?;
     ws.set_raw();
-    let hello = [&[FRAME_CONTROL][..], credentials(token, id).to_string().as_bytes()].concat();
+    let hello = [&[FRAME_CONTROL][..], credentials(auth, id).to_string().as_bytes()].concat();
     ws.send_bytes(Bytes::from(hello)).await.map_err(|e| e.to_string())?;
 
     let pair = portable_pty::native_pty_system()

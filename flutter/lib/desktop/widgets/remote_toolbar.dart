@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -846,6 +847,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       toolbarItems.add(_KeyboardMenu(id: widget.id, ffi: widget.ffi));
     }
     toolbarItems.add(_ChatMenu(id: widget.id, ffi: widget.ffi));
+    if (!isWeb) toolbarItems.add(_BmtSystemMenu(id: widget.id));
     if (!isWeb) {
       toolbarItems.add(_VoiceCallMenu(id: widget.id, ffi: widget.ffi));
     }
@@ -2967,6 +2969,196 @@ class _RecordMenu extends StatelessWidget {
       hoverColor: recordingModel.start
           ? _ToolbarTheme.hoverRedColor
           : _ToolbarTheme.hoverBlueColor,
+    );
+  }
+}
+
+// BMT Remote: a live system-info overlay for the machine you're connected to.
+// Numbers come from the console, gated by a short-lived token handed over at
+// Connect and stored per peer id. Shows nothing when there's no token.
+class _BmtSystemMenu extends StatefulWidget {
+  final String id;
+  const _BmtSystemMenu({Key? key, required this.id}) : super(key: key);
+  @override
+  State<_BmtSystemMenu> createState() => _BmtSystemMenuState();
+}
+
+class _BmtSystemMenuState extends State<_BmtSystemMenu> {
+  OverlayEntry? _entry;
+  Timer? _timer;
+  Map<String, dynamic>? _metrics;
+  String _status = '';
+
+  String get _token => bind.mainGetLocalOption(key: 'bmt-metrics-${widget.id}');
+
+  @override
+  void dispose() {
+    _close();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (_entry != null) {
+      _close();
+      return;
+    }
+    _status = 'Loading…';
+    _metrics = null;
+    final overlay = Overlay.of(context);
+    _entry = OverlayEntry(builder: _buildOverlay);
+    overlay.insert(_entry!);
+    _poll();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _poll());
+  }
+
+  void _close() {
+    _timer?.cancel();
+    _timer = null;
+    _entry?.remove();
+    _entry = null;
+  }
+
+  Future<void> _poll() async {
+    final token = _token;
+    if (token.isEmpty) {
+      _status = "Live metrics aren't available for this connection.";
+      _entry?.markNeedsBuild();
+      return;
+    }
+    try {
+      final r = await http
+          .get(Uri.parse('https://remote.bmtech.co.uk/api/peer-metrics?t=$token'))
+          .timeout(const Duration(seconds: 8));
+      if (_entry == null) return;
+      if (r.statusCode != 200) {
+        _status = 'Metrics unavailable (${r.statusCode}).';
+      } else {
+        final d = jsonDecode(r.body) as Map<String, dynamic>;
+        if (d['metrics'] is Map) {
+          _metrics = Map<String, dynamic>.from(d['metrics'] as Map);
+          _status = '';
+        } else {
+          _status = 'Waiting for the computer…';
+        }
+      }
+    } catch (_) {
+      _status = 'Could not reach the metrics service.';
+    }
+    _entry?.markNeedsBuild();
+  }
+
+  double _num(dynamic v) => v is num ? v.toDouble() : 0.0;
+
+  Widget _bar(String label, double pct, String value) {
+    final p = pct.clamp(0, 100).toDouble();
+    final color = p >= 90
+        ? const Color(0xffe5484d)
+        : p >= 70
+            ? const Color(0xfff0b13d)
+            : const Color(0xff0a84ff);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(color: Color(0xffa3b2c5), fontSize: 11, fontWeight: FontWeight.w600)),
+              Text(value, style: const TextStyle(color: Color(0xffe6edf6), fontSize: 11)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: p / 100.0,
+              minHeight: 6,
+              backgroundColor: const Color(0xff1d2938),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverlay(BuildContext context) {
+    final m = _metrics;
+    final ramGb = _num(m?['RamGb']);
+    final ramUsed = ramGb - _num(m?['RamFreeGb']);
+    final diskGb = _num(m?['DiskGb']);
+    final diskUsed = diskGb - _num(m?['DiskFreeGb']);
+    return Positioned(
+      top: 58,
+      right: 16,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 240,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+          decoration: BoxDecoration(
+            color: const Color(0xff121b27),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xff1f2b3a)),
+            boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('System', style: TextStyle(color: Color(0xffe6edf6), fontSize: 13, fontWeight: FontWeight.w700)),
+                  InkWell(
+                    onTap: _close,
+                    child: const Icon(Icons.close, size: 15, color: Color(0xff6f8096)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (m == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(_status.isEmpty ? 'Loading…' : _status,
+                      style: const TextStyle(color: Color(0xff6f8096), fontSize: 11.5)),
+                )
+              else ...[
+                _bar('CPU', _num(m['CpuLoad']), '${_num(m['CpuLoad']).round()}%'),
+                if (ramGb > 0)
+                  _bar('Memory', ramGb > 0 ? ramUsed / ramGb * 100 : 0,
+                      '${ramUsed.toStringAsFixed(1)} / ${ramGb.toStringAsFixed(0)} GB'),
+                if (diskGb > 0)
+                  _bar('Disk C:', diskGb > 0 ? diskUsed / diskGb * 100 : 0,
+                      '${_num(m['DiskFreeGb']).toStringAsFixed(0)} GB free'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('${_num(m['Procs']).round()} processes',
+                        style: const TextStyle(color: Color(0xff6f8096), fontSize: 11)),
+                    Text('up ${_num(m['UptimeHours']).toStringAsFixed(0)} h',
+                        style: const TextStyle(color: Color(0xff6f8096), fontSize: 11)),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_token.isEmpty) return const Offstage();
+    return _IconMenuButton(
+      icon: Icon(Icons.insights_outlined,
+          size: _ToolbarTheme.buttonSize, color: Colors.white),
+      tooltip: 'System info',
+      color: _entry != null ? _ToolbarTheme.blueColor : _ToolbarTheme.inactiveColor,
+      hoverColor: _entry != null ? _ToolbarTheme.hoverBlueColor : _ToolbarTheme.hoverInactiveColor,
+      onPressed: _toggle,
     );
   }
 }

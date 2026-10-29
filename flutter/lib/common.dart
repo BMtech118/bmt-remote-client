@@ -2260,7 +2260,9 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
   final bmtCode = sessionCodeFromUri(uri ??
       (uriString != null
           ? Uri.tryParse(uriString)
-          : (cmdArgs != null && cmdArgs.isNotEmpty ? Uri.tryParse(cmdArgs[0]) : null)));
+          : (cmdArgs != null && cmdArgs.isNotEmpty
+              ? Uri.tryParse(cmdArgs[0])
+              : null)));
   if (bmtCode != null) {
     bmtCheckIn(bmtCode);
     return false;
@@ -2486,6 +2488,12 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
       uri.queryParameters.map((k, v) => MapEntry(k.toLowerCase(), v));
 
   var key = queryParameters["key"];
+  // BMT Remote: a short-lived token for this machine's live-metrics overlay,
+  // stored by peer id so the remote window's toolbar can read it.
+  final bmtMetrics = queryParameters["metrics"];
+  if (bmtMetrics != null && id != null) {
+    bind.mainSetLocalOption(key: 'bmt-metrics-$id', value: bmtMetrics);
+  }
   if (id != null) {
     if (key != null) {
       id = "$id?key=$key";
@@ -3318,7 +3326,8 @@ String getDesktopTabLabel(String peerId, String alias, {String? hostname}) {
   var name = hostname ?? '';
   if (name.isEmpty) {
     try {
-      Map<String, dynamic> config = jsonDecode(bind.mainGetPeerSync(id: peerId));
+      Map<String, dynamic> config =
+          jsonDecode(bind.mainGetPeerSync(id: peerId));
       if (config['info']['hostname'] is String) {
         name = config['info']['hostname'];
       }

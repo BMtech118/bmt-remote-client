@@ -10,7 +10,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub fn start_tray() {
-    if crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
+    // BMT Remote: a managed access agent runs without a tray icon by default.
+    // An installed service hides it unless hide-tray is explicitly "N".
+    let hide_tray = crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY);
+    if hide_tray == "Y" || (hide_tray != "N" && crate::platform::is_installed()) {
         #[cfg(not(target_os = "macos"))]
         {
             return;

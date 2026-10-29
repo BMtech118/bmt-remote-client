@@ -1364,9 +1364,9 @@ pub fn get_silent_install_options(printer_override: Option<bool>) -> &'static st
         }
     };
     if install_printer && is_win_10_or_greater() {
-        "desktopicon startmenu printer"
+        "startmenu printer"
     } else {
-        "desktopicon startmenu"
+        "startmenu"
     }
 }
 

@@ -556,6 +556,10 @@ jobs:
           fi
 
       - name: Install NASM
+        # NASM is an x86/x86_64 assembler (aom, ffmpeg x86 asm). arm64 builds use
+        # NEON/gas instead, so skip it there (and avoid needing wget/sudo on the
+        # self-hosted arm64 runner).
+        if: matrix.job.arch == 'x86_64'
         run: |
           # Install NASM 2.16.x from official release.
           # Do NOT use `brew install nasm` which installs NASM 3.x.

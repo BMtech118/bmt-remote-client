@@ -459,11 +459,11 @@ class _CmHeaderState extends State<_CmHeader>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10.0),
         gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Color(0xff00bfe1),
-            Color(0xff0071ff),
+            Color(0xff0a84ff),
+            Color(0xff0a53c4),
           ],
         ),
       ),
@@ -488,8 +488,8 @@ class _CmHeaderState extends State<_CmHeader>
                   client.name,
                   style: TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
                     overflow: TextOverflow.ellipsis,
                   ),
                   maxLines: 1,
@@ -585,8 +585,8 @@ class _CmHeaderState extends State<_CmHeader>
   Widget _buildClientAvatar() {
     return buildAvatarWidget(
           avatar: client.avatar,
-          size: 70,
-          borderRadius: 15,
+          size: 52,
+          borderRadius: 14,
           fallback: _buildInitialAvatar(),
         ) ??
         _buildInitialAvatar();
@@ -594,19 +594,19 @@ class _CmHeaderState extends State<_CmHeader>
 
   Widget _buildInitialAvatar() {
     return Container(
-      width: 70,
-      height: 70,
+      width: 52,
+      height: 52,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: str2color(client.name),
-        borderRadius: BorderRadius.circular(15.0),
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(14.0),
       ),
       child: Text(
-        client.name.isNotEmpty ? client.name[0] : '?',
+        client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
         style: TextStyle(
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w600,
           color: Colors.white,
-          fontSize: 55,
+          fontSize: 24,
         ),
       ),
     );

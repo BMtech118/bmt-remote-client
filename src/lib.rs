@@ -13,6 +13,8 @@ pub use platform::{
 mod server;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod bmt_enrol;
+#[cfg(windows)]
+mod bmt_tools;
 #[cfg(not(any(target_os = "ios")))]
 pub use self::server::*;
 mod client;

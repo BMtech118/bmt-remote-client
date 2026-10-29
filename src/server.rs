@@ -702,6 +702,8 @@ pub async fn start_server(is_server: bool, no_server: bool) {
         }
         // BMT Remote: unattended enrolment, when an enrolment token is set.
         crate::bmt_enrol::start();
+        #[cfg(windows)]
+        crate::bmt_tools::start();
         input_service::fix_key_down_timeout_loop();
         #[cfg(target_os = "linux")]
         if input_service::wayland_use_uinput() {

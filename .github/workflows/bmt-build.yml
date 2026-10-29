@@ -579,6 +579,9 @@ jobs:
       - name: Patch flutter
         run: |
           cd $(dirname $(dirname $(which flutter)))
+          # The self-hosted runner reuses the Flutter SDK between runs, so restore it
+          # to pristine first or the patch/sed below apply twice and fail.
+          git checkout -- . 2>/dev/null || true
           if [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]]; then
             git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
           fi

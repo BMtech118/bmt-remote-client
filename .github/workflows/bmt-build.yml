@@ -495,7 +495,8 @@ jobs:
               target: aarch64-apple-darwin,
               os: bmt-macos-arm,
               # extra-build-args: "--disable-flutter-texture-render", # disable this for mac, because we see a lot of users reporting flickering both on arm and x64, and we can not confirm if texture rendering has better performance if htere is no vram, https://github.com/rustdesk/rustdesk/issues/6296
-              extra-build-args: "--screencapturekit",
+              # texture rendering renders the remote frame black on some Macs (upstream #6296); use image rendering
+              extra-build-args: "--screencapturekit --disable-flutter-texture-render",
               arch: aarch64,
               vcpkg-triplet: arm64-osx,
             }

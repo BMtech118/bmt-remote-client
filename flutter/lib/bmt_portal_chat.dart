@@ -145,8 +145,11 @@ class _BmtPortalChatState extends State<BmtPortalChat> {
       }
       if (res.statusCode != 200) return;
       final before = _messages.length;
+      final wasTyping = _typing != null;
       setState(() => _apply(jsonDecode(res.body)));
-      if (_messages.length != before) _toBottom();
+      if (_messages.length != before || (_typing != null && !wasTyping)) {
+        _toBottom();
+      }
     } catch (_) {}
   }
 
@@ -203,7 +206,7 @@ class _BmtPortalChatState extends State<BmtPortalChat> {
             style: TextStyle(
                 color: _onBlue,
                 fontWeight: FontWeight.w600,
-                fontSize: size * 0.38)),
+                fontSize: size < 30 ? size * 0.46 : size * 0.38)),
       );
 
   Widget _header() {

@@ -91,11 +91,20 @@ async fn run() {
         match wait(&token, &id).await {
             Ok(Some(Job::Terminal { sid, shell, cols, rows })) => {
                 let (token, id) = (token.clone(), id.clone());
-                tokio::spawn(async move {
-                    if let Err(e) = terminal(&token, &id, &sid, &shell, cols, rows).await {
-                        log::warn!("bmt tools: terminal ended: {e}");
+                // Its own thread and runtime: the PTY types aren't Send.
+                let spawned = std::thread::Builder::new().name("bmt-term".into()).spawn(move || {
+                    match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+                        Ok(rt) => {
+                            if let Err(e) = rt.block_on(terminal(&token, &id, &sid, &shell, cols, rows)) {
+                                log::warn!("bmt tools: terminal ended: {e}");
+                            }
+                        }
+                        Err(e) => log::error!("bmt tools: no runtime for the terminal: {e}"),
                     }
                 });
+                if let Err(e) = spawned {
+                    log::error!("bmt tools: could not start the terminal: {e}");
+                }
             }
             Ok(Some(Job::Command(cmd))) => {
                 let (shell, script, timeout) = (cmd.shell.clone(), cmd.script.clone(), cmd.timeout);
@@ -323,12 +332,14 @@ async fn terminal(token: &str, id: &str, sid: &str, shell: &str, cols: u16, rows
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
     let program = if shell == "cmd" { "cmd.exe" } else { "powershell.exe" };
-    let mut cmd = CommandBuilder::new(program);
-    if program == "powershell.exe" {
-        cmd.arg("-NoLogo");
-    }
-    cmd.cwd(std::env::var("SystemRoot").map(|r| format!("{r}\\System32")).unwrap_or_else(|_| "C:\\Windows\\System32".into()));
-    let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let mut child = {
+        let mut cmd = CommandBuilder::new(program);
+        if program == "powershell.exe" {
+            cmd.arg("-NoLogo");
+        }
+        cmd.cwd(std::env::var("SystemRoot").map(|r| format!("{r}\\System32")).unwrap_or_else(|_| "C:\\Windows\\System32".into()));
+        pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?
+    };
     drop(pair.slave);
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let mut writer = pair.master.take_writer().map_err(|e| e.to_string())?;

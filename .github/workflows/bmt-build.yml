@@ -663,6 +663,15 @@ jobs:
       - name: create unsigned dmg
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
+          # Without an Apple cert the app is ad-hoc signed per-binary, and the
+          # embedded frameworks end up with a different (ad-hoc) Team ID to the main
+          # binary, so the hardened runtime refuses to load FlutterMacOS.framework and
+          # the app will not launch. A deep ad-hoc re-sign unifies them. (Gatekeeper
+          # still needs the quarantine cleared on download until we have Developer ID.)
+          APP="./flutter/build/macos/Build/Products/Release/BMT Remote.app"
+          codesign --remove-signature "$APP" 2>/dev/null || true
+          codesign --force --deep --sign - "$APP"
+          codesign -vv "$APP" || true
           CREATE_DMG="$(command -v create-dmg)"
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"

@@ -43,17 +43,17 @@ class BmtCmBubble {
   }
 
   static Future<void> _apply() async {
-    final displays = WidgetsBinding.instance.platformDispatcher.displays;
-    if (displays.isEmpty) return;
-    final d = displays.first;
-    final w = d.size.width / d.devicePixelRatio;
-    final h = d.size.height / d.devicePixelRatio;
-    final rect = expanded.value
-        ? Rect.fromLTWH(w - _panelWidth - 14, 90, _panelWidth,
-            tab.value == 'chat' ? 600 : 560)
-        : Rect.fromLTWH(w - _collapsed.width, (h * 0.3).roundToDouble(),
-            _collapsed.width, _collapsed.height);
-    await windowManager.setBounds(rect);
+    // The connection window is briefly minimised whenever it is shown; a
+    // resize on its own leaves it parked off-screen, so restore it first.
+    if (await windowManager.isMinimized()) await windowManager.restore();
+    if (expanded.value) {
+      await windowManager.setSizeAlignment(
+          Size(_panelWidth, tab.value == 'chat' ? 600 : 560),
+          Alignment.topRight);
+    } else {
+      await windowManager.setSizeAlignment(_collapsed, Alignment.centerRight);
+    }
+    if (!await windowManager.isVisible()) await windowManager.show();
   }
 
   static void open(String which) {

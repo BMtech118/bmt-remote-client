@@ -20,6 +20,7 @@ import '../common.dart';
 import '../common/widgets/overlay.dart';
 import '../main.dart';
 import 'model.dart';
+import '../desktop/widgets/bmt_cm_bubble.dart';
 
 class MessageKey {
   final String peerId;
@@ -63,7 +64,20 @@ class ChatModel with ChangeNotifier {
 
   // BMT Remote: the technician's chat is a docked panel in the remote window.
   final RxBool bmtDockOpen = false.obs;
+  // Which tab of the docked panel is showing: chat, device or terminal.
+  final RxString bmtDockTab = 'chat'.obs;
   bool get _bmtDocked => isDesktop && !isConnManager;
+
+  /// Opens the docked panel on [tab], or closes it if that tab is already up.
+  void bmtToggleDockTab(String tab) {
+    if (bmtDockOpen.value && bmtDockTab.value == tab) {
+      bmtDockOpen.value = false;
+      return;
+    }
+    bmtDockTab.value = tab;
+    bmtDockOpen.value = true;
+    if (tab == 'chat') requestChatInputFocus();
+  }
 
   RxBool isWindowFocus = true.obs;
   BlockableOverlayState _blockableOverlayState = BlockableOverlayState();
@@ -200,6 +214,7 @@ class ChatModel with ChangeNotifier {
 
   showChatWindowOverlay({Offset? chatInitPos}) {
     if (_bmtDocked) {
+      bmtDockTab.value = 'chat';
       bmtDockOpen.value = true;
       requestChatInputFocus();
       return;
@@ -249,7 +264,7 @@ class ChatModel with ChangeNotifier {
   }
 
   _isChatOverlayHide() => _bmtDocked
-      ? !bmtDockOpen.value
+      ? !(bmtDockOpen.value && bmtDockTab.value == 'chat')
       : ((!(isDesktop || isWebDesktop) && chatIconOverlayEntry == null) ||
           chatWindowOverlayEntry == null);
 
@@ -306,6 +321,10 @@ class ChatModel with ChangeNotifier {
 
   var _togglingCMSidePage = false; // protect order for await
   toggleCMSidePage() async {
+    if (BmtCmBubble.showing.value) {
+      BmtCmBubble.openChat();
+      return false;
+    }
     if (_togglingCMSidePage) return false;
     _togglingCMSidePage = true;
     if (_isShowCMSidePage) {

@@ -16,12 +16,13 @@ import 'package:flutter_hbb/desktop/widgets/material_mod_popup_menu.dart'
     as mod_menu;
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:bot_toast/bot_toast.dart';
 
 import '../../common/widgets/dialog.dart';
+import '../../models/model.dart';
 import '../../models/platform_model.dart';
+import '../widgets/bmt_toolbar_style.dart';
 
 class _MenuTheme {
   static const Color blueColor = MyTheme.button;
@@ -131,8 +132,10 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
   @override
   Widget build(BuildContext context) {
     final child = Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
-      body: DesktopTab(
+      // BMT Remote: the navy tab bar shows through here.
+      backgroundColor: BmtTabBar.navy,
+      body: BmtTabBar.wrap(context, DesktopTab(
+        selectedTabBackgroundColor: BmtTabBar.selected,
         controller: tabController,
         onWindowCloseButton: handleWindowCloseButton,
         tail: Row(
@@ -147,14 +150,21 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
         labelGetter: DesktopTab.tablabelGetter,
         tabBuilder: (key, icon, label, themeConf) => Obx(() {
           final connectionType = ConnectionTypeState.find(key);
+          // BMT Remote: the tab is a chip with the machine name; connection
+          // details live in its tooltip instead of a shield icon.
+          final tabInfo = tabController.state.value.tabs
+              .firstWhereOrNull((tab) => tab.key == key);
+          // The page's FFI only exists once the page has been built.
+          FFI? tabFfi;
+          try {
+            if (tabInfo?.page is RemotePage) {
+              tabFfi = (tabInfo!.page as RemotePage).ffi;
+            }
+          } catch (_) {}
+          final selected =
+              tabController.state.value.selectedTabInfo.key == key;
           if (!connectionType.isValid()) {
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                icon,
-                label,
-              ],
-            );
+            return BmtTabChip(ffi: tabFfi, id: key, selected: selected);
           } else {
             bool secure =
                 connectionType.secure.value == ConnectionType.strSecure;
@@ -175,22 +185,17 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
               msgFingerprint += fingerprint;
             }
 
-            final tab = Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                icon,
-                Tooltip(
-                  message: '$msgConn\n$msgFingerprint',
-                  child: SvgPicture.asset(
-                    'assets/${connectionType.secure.value}${connectionType.direct.value}.svg',
-                    width: themeConf.iconSize,
-                    height: themeConf.iconSize,
-                  ).paddingOnly(right: 5),
-                ),
-                label,
-                unreadMessageCountBuilder(UnreadChatCountState.find(key))
-                    .marginOnly(left: 4),
-              ],
+            final tab = Tooltip(
+              message: '$msgConn\n$msgFingerprint',
+              waitDuration: const Duration(milliseconds: 600),
+              child: BmtTabChip(
+                ffi: tabFfi,
+                id: key,
+                selected: selected,
+                trailing:
+                    unreadMessageCountBuilder(UnreadChatCountState.find(key))
+                        .marginOnly(left: 4),
+              ),
             );
 
             return Listener(
@@ -214,7 +219,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
             );
           }
         }),
-      ),
+      )),
     );
     final tabWidget = isLinux
         ? buildVirtualWindowFrame(context, child)

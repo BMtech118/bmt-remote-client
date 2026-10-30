@@ -31,6 +31,7 @@ import 'mobile/widgets/deploy_dialog.dart';
 import 'models/platform_model.dart';
 import 'bmt_checkin.dart';
 import 'bmt_portal_chat.dart';
+import 'desktop/widgets/bmt_cm_bubble.dart';
 import 'bmt_error_log.dart';
 
 /// Basic window and launch properties.
@@ -327,6 +328,7 @@ showCmWindow({bool isStartup = false}) async {
     // ensure initial window size to be changed
     await windowManager.setSizeAlignment(
         kConnectionManagerWindowSizeClosedChat, Alignment.topRight);
+    await BmtCmBubble.reapply();
     _isCmReadyToShow = true;
   } else if (_isCmReadyToShow) {
     if (await windowManager.getOpacity() != 1) {
@@ -335,6 +337,7 @@ showCmWindow({bool isStartup = false}) async {
       await windowManager.minimize(); //needed
       await windowManager.setSizeAlignment(
           kConnectionManagerWindowSizeClosedChat, Alignment.topRight);
+      await BmtCmBubble.reapply();
       windowOnTop(null);
     }
   }

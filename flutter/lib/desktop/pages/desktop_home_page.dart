@@ -23,7 +23,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
-import '../widgets/button.dart';
+import '../widgets/bmt_home_sidebar.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -78,6 +78,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget buildLeftPane(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
+    // BMT Remote: the technician's home gets the navy sidebar.
+    if (!isIncomingOnly && !isOutgoingOnly) {
+      return BmtHomeSidebar(
+        onSettings: DesktopTabPage.onAddSetting,
+        warning: buildPresetPasswordWarning(),
+        cards: Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
+      );
+    }
     final children = <Widget>[
       if (!isOutgoingOnly) buildPresetPasswordWarning(),
       if (bind.isCustomClient())
@@ -604,28 +612,23 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
           child: Container(
               decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
-                ],
-              )),
-              padding: EdgeInsets.all(20),
+                color: const Color(0xff2a2013),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xff4a3618)),
+              ),
+              padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: (title.isNotEmpty
                           ? <Widget>[
-                              Center(
-                                  child: Text(
+                              Text(
                                 translate(title),
                                 style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15),
-                              ).marginOnly(bottom: 6)),
+                                    color: const Color(0xffffd58a),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13.5),
+                              ).marginOnly(bottom: 4),
                             ]
                           : <Widget>[]) +
                       <Widget>[
@@ -633,27 +636,35 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                           Text(
                             translate(content),
                             style: TextStyle(
-                                height: 1.5,
-                                color: Colors.white,
+                                height: 1.45,
+                                color: const Color(0xfff3d29b),
                                 fontWeight: FontWeight.normal,
-                                fontSize: 13),
-                          ).marginOnly(bottom: 20)
+                                fontSize: 12),
+                          ).marginOnly(bottom: 12)
                       ] +
                       (btnText.isNotEmpty
                           ? <Widget>[
                               Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    FixedWidthButton(
-                                      width: 150,
-                                      padding: 8,
-                                      isOutline: true,
-                                      text: translate(btnText),
-                                      textColor: Colors.white,
-                                      borderColor: Colors.white,
-                                      textSize: 20,
-                                      radius: 10,
-                                      onTap: onPressed,
+                                    Expanded(
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(8),
+                                        onTap: onPressed,
+                                        child: Container(
+                                          height: 32,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                              color: const Color(0xffffd58a),
+                                              borderRadius:
+                                                  BorderRadius.circular(8)),
+                                          child: Text(translate(btnText),
+                                              style: const TextStyle(
+                                                  color: Color(0xff2a2013),
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13)),
+                                        ),
+                                      ),
                                     )
                                   ])
                             ]
@@ -669,7 +680,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                         style: TextStyle(
                                             decoration:
                                                 TextDecoration.underline,
-                                            color: Colors.white,
+                                            color: const Color(0xfff3d29b),
                                             fontSize: 12),
                                       )).marginOnly(top: 6)),
                             ]

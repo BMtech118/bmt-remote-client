@@ -73,7 +73,10 @@ class MainFlutterWindow: NSWindow {
             // DesktopLifecyclePlugin.register(with: controller.registrar(forPlugin: "DesktopLifecyclePlugin"))
             // Note: copy below from above RegisterGeneratedPlugins
             self.setMethodHandler(registrar: controller.registrar(forPlugin: "RustDeskPlugin"))
-            DesktopDropPlugin.register(with: controller.registrar(forPlugin: "DesktopDropPlugin"))
+            // BMT Remote: desktop_drop always attaches to the main window, so a
+            // sub-window (the remote screen) never received drops. Give each
+            // window its own drop view on its own channel instead.
+            BmtWindowDrop.attach(to: controller)
             DeviceInfoPlusMacosPlugin.register(with: controller.registrar(forPlugin: "DeviceInfoPlusMacosPlugin"))
             FlutterCustomCursorPlugin.register(with: controller.registrar(forPlugin: "FlutterCustomCursorPlugin"))
             FPPPackageInfoPlusPlugin.register(with: controller.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
@@ -312,5 +315,94 @@ class MainFlutterWindow: NSWindow {
                     result(FlutterMethodNotImplemented)
                 }
         })
+    }
+}
+
+
+/// The desktop_drop plugin's macOS drop view, attached to one specific Flutter
+/// window and speaking the same "desktop_drop" channel protocol.
+final class BmtWindowDrop: NSView {
+    private let channel: FlutterMethodChannel
+    private static var keep: [BmtWindowDrop] = []
+
+    static func attach(to controller: FlutterViewController) {
+        let channel = FlutterMethodChannel(
+            name: "desktop_drop",
+            binaryMessenger: controller.registrar(forPlugin: "DesktopDropPlugin").messenger)
+        channel.setMethodCallHandler { _, result in result(FlutterMethodNotImplemented) }
+        let view = BmtWindowDrop(frame: controller.view.bounds, channel: channel)
+        view.autoresizingMask = [.width, .height]
+        view.registerForDraggedTypes(NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) })
+        view.registerForDraggedTypes([NSPasteboard.PasteboardType.fileURL])
+        controller.view.addSubview(view)
+        keep.append(view)
+    }
+
+    init(frame: NSRect, channel: FlutterMethodChannel) {
+        self.channel = channel
+        super.init(frame: frame)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    // Clicks go straight to Flutter, so the tab bar can still move the window;
+    // AppKit finds drop targets by registered types, not by this hit test.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        channel.invokeMethod("entered", arguments: point(sender.draggingLocation))
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        channel.invokeMethod("updated", arguments: point(sender.draggingLocation))
+        return .copy
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        channel.invokeMethod("exited", arguments: nil)
+    }
+
+    private lazy var destination: URL = {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Drops")
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
+        return url
+    }()
+
+    private lazy var queue: OperationQueue = {
+        let q = OperationQueue()
+        q.qualityOfService = .userInitiated
+        return q
+    }()
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        var urls = [String]()
+        let group = DispatchGroup()
+        sender.enumerateDraggingItems(options: [], for: nil,
+                                      classes: [NSFilePromiseReceiver.self, NSURL.self],
+                                      searchOptions: [.urlReadingFileURLsOnly: true]) { item, _, _ in
+            switch item.item {
+            case let promise as NSFilePromiseReceiver:
+                group.enter()
+                promise.receivePromisedFiles(atDestination: self.destination, options: [:], operationQueue: self.queue) { url, error in
+                    if error == nil { urls.append(url.path) }
+                    group.leave()
+                }
+            case let url as URL:
+                urls.append(url.path)
+            default: break
+            }
+        }
+        group.notify(queue: .main) {
+            self.channel.invokeMethod("performOperation", arguments: urls)
+        }
+        return true
+    }
+
+    private func point(_ location: NSPoint) -> [CGFloat] {
+        let local = convert(location, from: nil)
+        return [local.x, bounds.height - local.y]
     }
 }

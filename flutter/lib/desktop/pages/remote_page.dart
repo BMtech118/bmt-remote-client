@@ -23,6 +23,7 @@ import '../widgets/remote_toolbar.dart';
 import '../widgets/kb_layout_type_chooser.dart';
 import '../widgets/tabbar_widget.dart';
 import '../widgets/bmt_chat_panel.dart';
+import '../widgets/bmt_drop_zone.dart';
 import 'macos_full_screen_focus_recovery.dart';
 
 import 'package:flutter_hbb/native/custom_cursor.dart'
@@ -787,10 +788,13 @@ class _RemotePageState extends State<RemotePage>
     // BMT Remote: the remote screen makes room for the docked chat panel.
     // Stretch so the remote view gets the full height, as it did before docking.
     withChatPanel() => Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Expanded(child: bodyWidget()),
+          Expanded(
+              child: BmtDropZone(ffi: _ffi, id: widget.id, child: bodyWidget())),
           Obx(() => _ffi.chatModel.bmtDockOpen.isTrue
               ? BmtChatPanel(
                   chatModel: _ffi.chatModel,
+                  ffi: _ffi,
+                  id: widget.id,
                   title: getDesktopTabLabel(widget.id,
                       bind.mainGetPeerOptionSync(id: widget.id, key: 'alias'),
                       hostname: _ffi.ffiModel.pi.hostname))

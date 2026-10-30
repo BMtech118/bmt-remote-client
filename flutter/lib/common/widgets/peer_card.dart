@@ -15,13 +15,15 @@ import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import '../../desktop/widgets/popup_menu.dart';
 import 'dart:math' as math;
+import '../../desktop/widgets/bmt_toolbar_style.dart';
 
 typedef PopupMenuEntryBuilder = Future<List<mod_menu.PopupMenuEntry<String>>>
     Function(BuildContext);
 
 enum PeerUiType { grid, tile, list }
 
-final peerCardUiType = PeerUiType.grid.obs;
+// BMT Remote: machines show as a clean list by default.
+final peerCardUiType = PeerUiType.list.obs;
 
 bool? hideUsernameOnCard;
 
@@ -132,6 +134,7 @@ class _PeerCardState extends State<_PeerCard>
   }
 
   makeChild(bool isPortrait, Peer peer) {
+    if (!isPortrait && (isDesktop || isWebDesktop)) return _bmtRow(peer);
     final name = hideUsernameOnCard == true
         ? peer.hostname
         : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}';
@@ -241,6 +244,100 @@ class _PeerCardState extends State<_PeerCard>
           ),
         )
       ],
+    );
+  }
+
+  // BMT Remote: one machine as a row: platform, name and user, ID, actions.
+  Widget _bmtRow(Peer peer) {
+    final title = peer.alias.isNotEmpty
+        ? peer.alias
+        : (peer.hostname.isNotEmpty ? peer.hostname : formatID(peer.id));
+    final sub = hideUsernameOnCard == true ? '' : peer.username;
+    final p = peer.platform.toLowerCase();
+    final logo = p.contains('windows')
+        ? 'windows-logo'
+        : p.contains('mac')
+            ? 'apple-logo'
+            : p.contains('android')
+                ? 'android-logo'
+                : p.contains('linux')
+                    ? 'linux-logo'
+                    : 'desktop-tower';
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.only(left: 12, right: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: BmtTb.line),
+      ),
+      child: Row(children: [
+        Stack(clipBehavior: Clip.none, children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+                color: BmtTb.blueSoft, borderRadius: BorderRadius.circular(9)),
+            alignment: Alignment.center,
+            child: BmtTb.icon(logo, BmtTb.blue, size: 19),
+          ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Tooltip(
+              message: translate(peer.online ? 'Online' : 'Offline'),
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: peer.online ? BmtTb.green : const Color(0xffc3c8d0),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
+          ),
+        ]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: BmtTb.ink,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600)),
+                if (sub.isNotEmpty || _showNote(peer))
+                  Text(
+                      [sub, if (_showNote(peer)) peer.note]
+                          .where((e) => e.isNotEmpty)
+                          .join(' · '),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: BmtTb.ink3, fontSize: 12)),
+              ]),
+        ),
+        SizedBox(
+          width: 120,
+          child: Text(formatID(peer.id),
+              style: const TextStyle(color: BmtTb.ink2, fontSize: 12.5)),
+        ),
+        Tooltip(
+          message: translate('Connect'),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => widget.connect(context, peer.id),
+            child: SizedBox(
+                width: 32,
+                height: 32,
+                child:
+                    Center(child: BmtTb.icon('arrow-right', BmtTb.blue, size: 17))),
+          ),
+        ),
+        checkBoxOrActionMoreLandscape(peer, isTile: true),
+      ]),
     );
   }
 

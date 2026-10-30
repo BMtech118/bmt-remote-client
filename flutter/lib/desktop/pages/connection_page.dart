@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -20,6 +19,7 @@ import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
+import '../widgets/bmt_toolbar_style.dart';
 
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})
@@ -80,9 +80,8 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
     setupServerWidget() => Flexible(
           child: Offstage(
-            offstage: !(!_svcStopped.value &&
-                stateGlobal.svcStatus.value == SvcStatus.ready &&
-                _svcIsUsingPublicServer.value),
+            // BMT Remote runs its own server, so never suggest setting one up.
+            offstage: true,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -314,11 +313,10 @@ class _ConnectionPageState extends State<ConnectionPage>
                 Flexible(child: _buildRemoteIDTextField(context)),
               ],
             ).marginOnly(top: 22),
-            SizedBox(height: 12),
-            Divider().paddingOnly(right: 12),
+            SizedBox(height: 18),
             Expanded(child: PeerTabPage()),
           ],
-        ).paddingOnly(left: 12.0)),
+        ).paddingOnly(left: 24.0, right: 24.0)),
         if (!isOutgoingOnly) const Divider(height: 1),
         if (!isOutgoingOnly) OnlineStatusWidget()
       ],
@@ -344,15 +342,29 @@ class _ConnectionPageState extends State<ConnectionPage>
   /// Search for a peer.
   Widget _buildRemoteIDTextField(BuildContext context) {
     var w = Container(
-      width: 320 + 20 * 2,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+      padding: const EdgeInsets.fromLTRB(20, 18, 18, 16),
       decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(13)),
-          border: Border.all(color: Theme.of(context).colorScheme.background)),
+        color: Colors.white,
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+        border: Border.all(color: BmtTb.line),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x1a0d1a2e),
+              blurRadius: 24,
+              offset: Offset(0, 8),
+              spreadRadius: -16)
+        ],
+      ),
       child: Ink(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            getConnectionPageTitle(context, false).marginOnly(bottom: 15),
+            Text(translate('Connect to a computer'),
+                    style: const TextStyle(
+                        color: BmtTb.ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600))
+                .marginOnly(bottom: 12),
             Row(
               children: [
                 Expanded(
@@ -421,14 +433,36 @@ class _ConnectionPageState extends State<ConnectionPage>
                           focusNode: fieldFocusNode,
                           style: const TextStyle(
                             fontFamily: 'WorkSans',
-                            fontSize: 22,
-                            height: 1.4,
+                            fontSize: 19,
+                            height: 1.3,
+                            color: BmtTb.ink,
                           ),
                           maxLines: 1,
                           cursorColor:
                               Theme.of(context).textTheme.titleLarge?.color,
                           decoration: InputDecoration(
-                              filled: false,
+                              filled: true,
+                              fillColor: const Color(0xfffbfbfc),
+                              prefixIcon: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 12, right: 8),
+                                child: BmtTb.icon('desktop-tower', BmtTb.ink3,
+                                    size: 18),
+                              ),
+                              prefixIconConstraints:
+                                  const BoxConstraints(minWidth: 0),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: BmtTb.line)),
+                              enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: BmtTb.line)),
+                              focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: BmtTb.blue, width: 1.5)),
                               counterText: '',
                               hintText: _idInputFocused.value
                                   ? null
@@ -513,27 +547,36 @@ class _ConnectionPageState extends State<ConnectionPage>
                     );
                   },
                 )),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 13.0),
-              child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                const SizedBox(width: 8),
+
                 SizedBox(
-                  height: 28.0,
-                  child: ElevatedButton(
+                  height: 44.0,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: BmtTb.blue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
                     onPressed: () {
                       onConnect();
                     },
-                    child: Text(translate("Connect")),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                    label: Text(translate("Connect"),
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  height: 28.0,
-                  width: 28.0,
+                  height: 44.0,
+                  width: 44.0,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).dividerColor),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                    border: Border.all(color: BmtTb.line),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
                     child: StatefulBuilder(
@@ -614,6 +657,17 @@ class _ConnectionPageState extends State<ConnectionPage>
                     ),
                   ),
                 ),
+              ],
+            ),
+            // Quick ways in, besides a full remote session.
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(children: [
+                _bmtQuick('folder-simple-dashed', 'Files',
+                    () => onConnect(isFileTransfer: true)),
+                const SizedBox(width: 16),
+                _bmtQuick('terminal-window', 'Terminal',
+                    () => onConnect(isTerminal: true)),
               ]),
             ),
           ],
@@ -621,6 +675,23 @@ class _ConnectionPageState extends State<ConnectionPage>
       ),
     );
     return Container(
-        constraints: const BoxConstraints(maxWidth: 600), child: w);
+        constraints: const BoxConstraints(maxWidth: 760), child: w);
   }
+
+  Widget _bmtQuick(String icon, String label, VoidCallback onTap) => InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () {
+          if (_idController.id.isEmpty) return;
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            BmtTb.icon(icon, BmtTb.ink3, size: 15),
+            const SizedBox(width: 6),
+            Text(translate(label),
+                style: const TextStyle(color: BmtTb.ink3, fontSize: 12.5)),
+          ]),
+        ),
+      );
 }

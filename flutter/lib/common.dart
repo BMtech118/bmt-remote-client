@@ -2494,6 +2494,12 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
   if (bmtMetrics != null && id != null) {
     bind.mainSetLocalOption(key: 'bmt-metrics-$id', value: bmtMetrics);
   }
+  // And a short-lived pass for the docked live terminal, tied to the
+  // technician who pressed Connect.
+  final bmtTerm = queryParameters["term"];
+  if (bmtTerm != null && id != null) {
+    bind.mainSetLocalOption(key: 'bmt-term-$id', value: bmtTerm);
+  }
   if (id != null) {
     if (key != null) {
       id = "$id?key=$key";

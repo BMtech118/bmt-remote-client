@@ -21,6 +21,7 @@ import '../../common/widgets/chat_page.dart';
 import '../../models/file_model.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
+import '../widgets/bmt_cm_bubble.dart';
 
 /// Set only by this window's own close control, and only once the user has confirmed. Any other
 /// way the window can go - a session logout closing every window, the window manager, a native
@@ -183,6 +184,10 @@ class ConnectionManagerState extends State<ConnectionManager>
       }
     }
 
+    // BMT Remote: once everything is accepted, the customer gets the edge bubble.
+    if (BmtCmBubble.eligible(serverModel.clients)) {
+      return BmtCmBubbleView(clients: serverModel.clients);
+    }
     return serverModel.clients.isEmpty
         ? Column(
             children: [

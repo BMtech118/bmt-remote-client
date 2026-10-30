@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:async';
-import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +21,7 @@ import '../../models/model.dart';
 import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
 import './popup_menu.dart';
+import './bmt_toolbar_style.dart';
 import './kb_layout_type_chooser.dart';
 import 'package:flutter_hbb/utils/scale.dart';
 import 'package:flutter_hbb/common/widgets/custom_scale_base.dart';
@@ -336,10 +336,10 @@ class _ToolbarTheme {
   static const double height = 20.0;
   static const double dividerHeight = 12.0;
 
-  static const double buttonSize = 32;
+  static const double buttonSize = BmtTb.buttonSize;
   static const double buttonHMargin = 2;
   static const double buttonVMargin = 6;
-  static const double iconRadius = 8;
+  static const double iconRadius = BmtTb.buttonRadius;
   static const double elevation = 3;
 
   static double dividerSpaceToAction = isWindows ? 8 : 14;
@@ -626,6 +626,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
   @override
   initState() {
     super.initState();
+    bmtDefaultMacCommandKeys(widget.ffi);
 
     final cached = _cachedToolbarDockingOptions(widget.ffi.sessionId);
     final multiEdgeEnabled =
@@ -803,7 +804,8 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
   Widget _buildToolbar(
       BuildContext context, _ToolbarEdge edge, bool isHorizontal) {
     final List<Widget> toolbarItems = [];
-    toolbarItems.add(_PinMenu(state: widget.state));
+    // BMT Remote: capsule order, machine chip first and End last.
+    toolbarItems.add(BmtMachineChip(ffi: widget.ffi, horizontal: isHorizontal));
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);
       if ((privacyModeState.isEmpty ||
@@ -815,9 +817,6 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
         return const Offstage();
       }
     }));
-    if (!isWebDesktop) {
-      toolbarItems.add(_MobileActionMenu(ffi: widget.ffi));
-    }
 
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);
@@ -834,26 +833,45 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       }
     }));
 
+    final displayItems = toolbarItems.sublist(1);
+    toolbarItems.removeRange(1, toolbarItems.length);
     toolbarItems
         .add(_ControlMenu(id: widget.id, ffi: widget.ffi, state: widget.state));
+    // Do not show keyboard for camera connection type.
+    if (widget.ffi.connType == ConnType.defaultConn) {
+      toolbarItems.add(_KeyboardMenu(id: widget.id, ffi: widget.ffi));
+    }
+    toolbarItems.add(BmtTbDivider(horizontal: isHorizontal));
+    toolbarItems.addAll(displayItems);
     toolbarItems.add(_DisplayMenu(
       id: widget.id,
       ffi: widget.ffi,
       state: widget.state,
       setFullscreen: _setFullscreen,
     ));
-    // Do not show keyboard for camera connection type.
-    if (widget.ffi.connType == ConnType.defaultConn) {
-      toolbarItems.add(_KeyboardMenu(id: widget.id, ffi: widget.ffi));
-    }
+    toolbarItems.add(BmtTbDivider(horizontal: isHorizontal));
     toolbarItems.add(_ChatMenu(id: widget.id, ffi: widget.ffi));
-    if (!isWeb) toolbarItems.add(_BmtSystemMenu(id: widget.id));
+    if (!isWeb) toolbarItems.add(_BmtDockButton(ffi: widget.ffi, tab: 'terminal', icon: 'terminal-window', tooltip: 'Terminal'));
+    if (!isWeb) toolbarItems.add(_BmtDockButton(ffi: widget.ffi, tab: 'device', icon: 'cpu', tooltip: 'Device'));
     if (!isWeb) {
       toolbarItems.add(_VoiceCallMenu(id: widget.id, ffi: widget.ffi));
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
-    toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
-    final toolbarBorderRadius = BorderRadius.all(Radius.circular(4.0));
+    toolbarItems.add(BmtTbDivider(horizontal: isHorizontal));
+    if (!isWebDesktop) {
+      toolbarItems.add(_MobileActionMenu(ffi: widget.ffi));
+    }
+    toolbarItems.add(_PinMenu(state: widget.state));
+    toolbarItems.add(BmtEndButton(
+      horizontal: isHorizontal,
+      onPressed: () async {
+        if (await showConnEndAuditDialogCloseCanceled(ffi: widget.ffi)) {
+          return;
+        }
+        closeConnection(id: widget.id);
+      },
+    ));
+    final toolbarBorderRadius = BorderRadius.all(Radius.circular(BmtTb.radius));
     // innerAxis: how the toolbar icons themselves flow.
     // outerAxis: how the toolbar block and the handle stack against each other
     // (perpendicular to the dock edge, so the handle hangs off the interior face).
@@ -863,21 +881,18 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
         ? SizedBox(width: _ToolbarTheme.buttonHMargin * 2)
         : SizedBox(height: _ToolbarTheme.buttonHMargin * 2);
     final toolbarMaterial = Material(
-      elevation: _ToolbarTheme.elevation,
-      shadowColor: MyTheme.color(context).shadow,
+      elevation: 0,
       borderRadius: toolbarBorderRadius,
-      color: Theme.of(context)
-          .menuBarTheme
-          .style
-          ?.backgroundColor
-          ?.resolve(MaterialState.values.toSet()),
+      color: BmtTb.paper,
       child: SingleChildScrollView(
         scrollDirection: innerAxis,
         child: Theme(
           data: themeData(),
-          child: _ToolbarTheme.borderWrapper(
-              context,
-              Flex(
+          child: Container(
+              padding: isHorizontal
+                  ? const EdgeInsets.fromLTRB(6, 3, 4, 3)
+                  : const EdgeInsets.fromLTRB(3, 6, 3, 4),
+              child: Flex(
                 direction: innerAxis,
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -885,18 +900,22 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
                   ...toolbarItems,
                   spacer,
                 ],
-              ),
-              toolbarBorderRadius),
+              )),
         ),
       ),
+    );
+    final capsule = Container(
+      decoration: BoxDecoration(
+          borderRadius: toolbarBorderRadius, boxShadow: BmtTb.capsuleShadow),
+      child: toolbarMaterial,
     );
     final handle = _buildDraggableCollapse(context, edge, isHorizontal);
     // The handle hangs off the interior face of the toolbar (away from the
     // docked edge), centered along that face by the Flex's default cross-axis
     // alignment, so the icons themselves sit flush against the docked edge.
     final children = (edge == _ToolbarEdge.top || edge == _ToolbarEdge.left)
-        ? [toolbarMaterial, handle]
-        : [handle, toolbarMaterial];
+        ? [capsule, handle]
+        : [handle, capsule];
     return Flex(
       direction: outerAxis,
       mainAxisSize: MainAxisSize.min,
@@ -2812,6 +2831,20 @@ class _ChatMenuState extends State<_ChatMenu> {
   Widget build(BuildContext context) {
     if (isWeb) {
       return buildTextChatButton();
+    } else if (isDesktop) {
+      // BMT Remote: chat is a tab of the docked panel, one click away.
+      return Obx(() {
+        final chat = widget.ffi.chatModel;
+        final on = chat.bmtDockOpen.isTrue && chat.bmtDockTab.value == 'chat';
+        return _IconMenuButton(
+          assetName: 'assets/chat.svg',
+          tooltip: 'Chat',
+          key: chatButtonKey,
+          onPressed: () => chat.bmtToggleDockTab('chat'),
+          color: on ? BmtTb.active : _ToolbarTheme.blueColor,
+          hoverColor: _ToolbarTheme.hoverBlueColor,
+        );
+      });
     } else {
       return _IconSubmenuButton(
           tooltip: 'Chat',
@@ -2973,193 +3006,33 @@ class _RecordMenu extends StatelessWidget {
   }
 }
 
-// BMT Remote: a live system-info overlay for the machine you're connected to.
-// Numbers come from the console, gated by a short-lived token handed over at
-// Connect and stored per peer id. Shows nothing when there's no token.
-class _BmtSystemMenu extends StatefulWidget {
-  final String id;
-  const _BmtSystemMenu({Key? key, required this.id}) : super(key: key);
-  @override
-  State<_BmtSystemMenu> createState() => _BmtSystemMenuState();
-}
-
-class _BmtSystemMenuState extends State<_BmtSystemMenu> {
-  OverlayEntry? _entry;
-  Timer? _timer;
-  Map<String, dynamic>? _metrics;
-  String _status = '';
-
-  String get _token => bind.mainGetLocalOption(key: 'bmt-metrics-${widget.id}');
-
-  @override
-  void dispose() {
-    _close();
-    super.dispose();
-  }
-
-  void _toggle() {
-    if (_entry != null) {
-      _close();
-      return;
-    }
-    _status = 'Loading…';
-    _metrics = null;
-    final overlay = Overlay.of(context);
-    _entry = OverlayEntry(builder: _buildOverlay);
-    overlay.insert(_entry!);
-    _poll();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _poll());
-  }
-
-  void _close() {
-    _timer?.cancel();
-    _timer = null;
-    _entry?.remove();
-    _entry = null;
-  }
-
-  Future<void> _poll() async {
-    final token = _token;
-    if (token.isEmpty) {
-      _status = "Live metrics aren't available for this connection.";
-      _entry?.markNeedsBuild();
-      return;
-    }
-    try {
-      final r = await http
-          .get(Uri.parse('https://remote.bmtech.co.uk/api/peer-metrics?t=$token'))
-          .timeout(const Duration(seconds: 8));
-      if (_entry == null) return;
-      if (r.statusCode != 200) {
-        _status = 'Metrics unavailable (${r.statusCode}).';
-      } else {
-        final d = jsonDecode(r.body) as Map<String, dynamic>;
-        if (d['metrics'] is Map) {
-          _metrics = Map<String, dynamic>.from(d['metrics'] as Map);
-          _status = '';
-        } else {
-          _status = 'Waiting for the computer…';
-        }
-      }
-    } catch (_) {
-      _status = 'Could not reach the metrics service.';
-    }
-    _entry?.markNeedsBuild();
-  }
-
-  double _num(dynamic v) => v is num ? v.toDouble() : 0.0;
-
-  Widget _bar(String label, double pct, String value) {
-    final p = pct.clamp(0, 100).toDouble();
-    final color = p >= 90
-        ? const Color(0xffe5484d)
-        : p >= 70
-            ? const Color(0xfff0b13d)
-            : const Color(0xff0a84ff);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label, style: const TextStyle(color: Color(0xffa3b2c5), fontSize: 11, fontWeight: FontWeight.w600)),
-              Text(value, style: const TextStyle(color: Color(0xffe6edf6), fontSize: 11)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: p / 100.0,
-              minHeight: 6,
-              backgroundColor: const Color(0xff1d2938),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOverlay(BuildContext context) {
-    final m = _metrics;
-    final ramGb = _num(m?['RamGb']);
-    final ramUsed = ramGb - _num(m?['RamFreeGb']);
-    final diskGb = _num(m?['DiskGb']);
-    final diskUsed = diskGb - _num(m?['DiskFreeGb']);
-    return Positioned(
-      top: 58,
-      right: 16,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: 240,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-          decoration: BoxDecoration(
-            color: const Color(0xff121b27),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xff1f2b3a)),
-            boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('System', style: TextStyle(color: Color(0xffe6edf6), fontSize: 13, fontWeight: FontWeight.w700)),
-                  InkWell(
-                    onTap: _close,
-                    child: const Icon(Icons.close, size: 15, color: Color(0xff6f8096)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (m == null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(_status.isEmpty ? 'Loading…' : _status,
-                      style: const TextStyle(color: Color(0xff6f8096), fontSize: 11.5)),
-                )
-              else ...[
-                _bar('CPU', _num(m['CpuLoad']), '${_num(m['CpuLoad']).round()}%'),
-                if (ramGb > 0)
-                  _bar('Memory', ramGb > 0 ? ramUsed / ramGb * 100 : 0,
-                      '${ramUsed.toStringAsFixed(1)} / ${ramGb.toStringAsFixed(0)} GB'),
-                if (diskGb > 0)
-                  _bar('Disk C:', diskGb > 0 ? diskUsed / diskGb * 100 : 0,
-                      '${_num(m['DiskFreeGb']).toStringAsFixed(0)} GB free'),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('${_num(m['Procs']).round()} processes',
-                        style: const TextStyle(color: Color(0xff6f8096), fontSize: 11)),
-                    Text('up ${_num(m['UptimeHours']).toStringAsFixed(0)} h',
-                        style: const TextStyle(color: Color(0xff6f8096), fontSize: 11)),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+// BMT Remote: opens a tab of the docked panel (Device, Terminal).
+class _BmtDockButton extends StatelessWidget {
+  final FFI ffi;
+  final String tab;
+  final String icon;
+  final String tooltip;
+  const _BmtDockButton(
+      {Key? key,
+      required this.ffi,
+      required this.tab,
+      required this.icon,
+      required this.tooltip})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    if (_token.isEmpty) return const Offstage();
-    return _IconMenuButton(
-      icon: Icon(Icons.insights_outlined,
-          size: _ToolbarTheme.buttonSize, color: Colors.white),
-      tooltip: 'System info',
-      color: _entry != null ? _ToolbarTheme.blueColor : _ToolbarTheme.inactiveColor,
-      hoverColor: _entry != null ? _ToolbarTheme.hoverBlueColor : _ToolbarTheme.hoverInactiveColor,
-      onPressed: _toggle,
-    );
+    return Obx(() {
+      final chat = ffi.chatModel;
+      final on = chat.bmtDockOpen.isTrue && chat.bmtDockTab.value == tab;
+      return _IconMenuButton(
+        assetName: 'assets/bmt/ph-$icon.svg',
+        tooltip: tooltip,
+        onPressed: () => chat.bmtToggleDockTab(tab),
+        color: on ? BmtTb.active : _ToolbarTheme.blueColor,
+        hoverColor: _ToolbarTheme.hoverBlueColor,
+      );
+    });
   }
 }
 
@@ -3221,13 +3094,17 @@ class _IconMenuButtonState extends State<_IconMenuButton> {
   @override
   Widget build(BuildContext context) {
     assert(widget.assetName != null || widget.icon != null);
+    final bmtIcon = widget.icon == null ? BmtTb.iconFor(widget.assetName) : null;
     final icon = widget.icon ??
-        SvgPicture.asset(
-          widget.assetName!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          width: _ToolbarTheme.buttonSize,
-          height: _ToolbarTheme.buttonSize,
-        );
+        (bmtIcon != null
+            ? Center(
+                child: BmtTb.glyph(bmtIcon, BmtTb.iconColor(widget.color, hover)))
+            : SvgPicture.asset(
+                widget.assetName!,
+                colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                width: _ToolbarTheme.buttonSize,
+                height: _ToolbarTheme.buttonSize,
+              ));
     var button = SizedBox(
       width: widget.width ?? _ToolbarTheme.buttonSize,
       height: _ToolbarTheme.buttonSize,
@@ -3248,7 +3125,9 @@ class _IconMenuButtonState extends State<_IconMenuButton> {
                     decoration: BoxDecoration(
                       borderRadius:
                           BorderRadius.circular(_ToolbarTheme.iconRadius),
-                      color: hover ? widget.hoverColor : widget.color,
+                      color: bmtIcon != null
+                          ? BmtTb.hoverFill(widget.color, hover)
+                          : (hover ? widget.hoverColor : widget.color),
                     ),
                     child: icon)),
           )),
@@ -3306,19 +3185,22 @@ class _IconSubmenuButtonState extends State<_IconSubmenuButton> {
   @override
   Widget build(BuildContext context) {
     assert(widget.svg != null || widget.icon != null);
+    final bmtIcon = widget.icon == null ? BmtTb.iconFor(widget.svg) : null;
     final icon = widget.icon ??
-        SvgPicture.asset(
-          widget.svg!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          width: _ToolbarTheme.buttonSize,
-          height: _ToolbarTheme.buttonSize,
-        );
+        (bmtIcon != null
+            ? Center(
+                child: BmtTb.glyph(bmtIcon, BmtTb.iconColor(widget.color, hover)))
+            : SvgPicture.asset(
+                widget.svg!,
+                colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                width: _ToolbarTheme.buttonSize,
+                height: _ToolbarTheme.buttonSize,
+              ));
     final button = SizedBox(
         width: widget.width ?? _ToolbarTheme.buttonSize,
         height: _ToolbarTheme.buttonSize,
         child: SubmenuButton(
-            menuStyle:
-                widget.menuStyle ?? _ToolbarTheme.defaultMenuStyle(context),
+            menuStyle: widget.menuStyle ?? BmtTb.menuStyle(),
             style: _ToolbarTheme.defaultMenuButtonStyle,
             onHover: (value) => setState(() {
                   hover = value;
@@ -3331,7 +3213,9 @@ class _IconSubmenuButtonState extends State<_IconSubmenuButton> {
                         decoration: BoxDecoration(
                           borderRadius:
                               BorderRadius.circular(_ToolbarTheme.iconRadius),
-                          color: hover ? widget.hoverColor : widget.color,
+                          color: bmtIcon != null
+                              ? BmtTb.hoverFill(widget.color, hover)
+                              : (hover ? widget.hoverColor : widget.color),
                         ),
                         child: icon))),
             menuChildren: widget

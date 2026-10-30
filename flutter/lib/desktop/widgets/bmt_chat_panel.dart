@@ -42,6 +42,15 @@ class _BmtChatPanelState extends State<BmtChatPanel> {
   late double _width;
 
   @override
+  void dispose() {
+    // Give the space back to the remote screen.
+    final canvas = widget.ffi.canvasModel;
+    canvas.bmtDockWidth = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) => canvas.updateViewStyle());
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     _width = double.tryParse(bind.getLocalFlutterOption(k: _kWidthOption)) ??
@@ -84,6 +93,12 @@ class _BmtChatPanelState extends State<BmtChatPanel> {
       final width = tab == 'terminal' && _width < _kTerminalMinWidth
           ? _kTerminalMinWidth
           : _width;
+      // The canvas reads this when it refits (resize handle included).
+      if (widget.ffi.canvasModel.bmtDockWidth != width) {
+        widget.ffi.canvasModel.bmtDockWidth = width;
+        WidgetsBinding.instance.addPostFrameCallback(
+            (_) => widget.ffi.canvasModel.updateViewStyle());
+      }
       return SizedBox(
         width: width,
         child: Row(

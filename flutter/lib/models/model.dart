@@ -2343,11 +2343,15 @@ class CanvasModel with ChangeNotifier {
   static double get bottomToEdge =>
       isDesktop ? windowBorderWidth + kDragToResizeAreaPadding.bottom : 0;
 
+  // BMT Remote: width taken by the docked side panel (chat, device, terminal),
+  // so the remote screen fits beside it instead of running underneath.
+  double bmtDockWidth = 0;
+
   Size getSize() {
     final mediaData = MediaQueryData.fromView(ui.window);
     final size = mediaData.size;
     // If minimized, w or h may be negative here.
-    double w = size.width - leftToEdge - rightToEdge;
+    double w = size.width - leftToEdge - rightToEdge - bmtDockWidth;
     double h = size.height - topToEdge - bottomToEdge;
     if (isMobile) {
       // Account for horizontal safe area insets on both orientations.

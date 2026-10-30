@@ -21,6 +21,8 @@ class BmtCmBubble {
   static final expanded = true.obs;
   static final tab = 'session'.obs;
   static final Map<int, DateTime> _since = {};
+  // Once the customer drags it somewhere, keep it there.
+  static bool _moved = false;
 
   static const _collapsed = Size(272, 56);
   static const _panelWidth = 380.0;
@@ -44,7 +46,11 @@ class BmtCmBubble {
     // The connection window is briefly minimised whenever it is shown; a
     // resize on its own leaves it parked off-screen, so restore it first.
     if (await windowManager.isMinimized()) await windowManager.restore();
-    if (expanded.value) {
+    if (_moved) {
+      await windowManager.setSize(expanded.value
+          ? Size(_panelWidth, tab.value == 'chat' ? 600 : 560)
+          : _collapsed);
+    } else if (expanded.value) {
       await windowManager.setSizeAlignment(
           Size(_panelWidth, tab.value == 'chat' ? 600 : 560),
           Alignment.topRight);
@@ -52,6 +58,11 @@ class BmtCmBubble {
       await windowManager.setSizeAlignment(_collapsed, Alignment.centerRight);
     }
     if (!await windowManager.isVisible()) await windowManager.show();
+  }
+
+  static void startDrag() {
+    _moved = true;
+    windowManager.startDragging();
   }
 
   static void open(String which) {
@@ -169,7 +180,10 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
   Widget _collapsedView() {
     return Material(
       color: BmtTabBar.navy,
-      child: Row(children: [
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onPanStart: (_) => BmtCmBubble.startDrag(),
+        child: Row(children: [
         InkWell(
           onTap: () => BmtCmBubble.open('session'),
           child: Padding(
@@ -217,6 +231,7 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
         _iconButton('x', translate('End session'), _endSession),
         const SizedBox(width: 6),
       ]),
+      ),
     );
   }
 
@@ -376,7 +391,10 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
     return Material(
       color: Colors.white,
       child: Column(children: [
-        Container(
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onPanStart: (_) => BmtCmBubble.startDrag(),
+          child: Container(
           color: BmtTabBar.navy,
           padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
           child: Row(children: [
@@ -409,6 +427,7 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
               ),
             ),
           ]),
+        ),
         ),
         Container(
           padding: const EdgeInsets.only(left: 8),

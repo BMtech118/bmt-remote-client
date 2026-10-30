@@ -4,8 +4,6 @@
 // with what the technician can do (each a switch the customer controls) and
 // the chat. Used only once every connection is accepted; anything still
 // waiting for Accept shows the normal window.
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
@@ -74,7 +72,6 @@ class BmtCmBubbleView extends StatefulWidget {
 }
 
 class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
-  Timer? _autoCollapse;
   final List<Worker> _workers = [];
 
   Client get _client => widget.clients.first;
@@ -84,24 +81,18 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
     super.initState();
     BmtCmBubble.showing.value = true;
     BmtCmBubble.tab.value = 'session';
-    BmtCmBubble.expanded.value = true;
+    // Start as the small tab on the screen edge; the customer opens it.
+    BmtCmBubble.expanded.value = false;
     _workers.add(ever(BmtCmBubble.expanded, (_) => BmtCmBubble._apply()));
     _workers.add(ever(BmtCmBubble.tab, (t) {
       if (t == 'chat') _focusChat();
       BmtCmBubble._apply();
     }));
     WidgetsBinding.instance.addPostFrameCallback((_) => BmtCmBubble._apply());
-    // Open as the "connected" notice, then tuck into the edge.
-    _autoCollapse = Timer(const Duration(seconds: 7), () {
-      if (BmtCmBubble.tab.value == 'session') {
-        BmtCmBubble.expanded.value = false;
-      }
-    });
   }
 
   @override
   void dispose() {
-    _autoCollapse?.cancel();
     for (final w in _workers) {
       w.dispose();
     }
@@ -454,10 +445,7 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => _autoCollapse?.cancel(),
-      child: Obx(() =>
-          BmtCmBubble.expanded.value ? _expandedView() : _collapsedView()),
-    );
+    return Obx(() =>
+        BmtCmBubble.expanded.value ? _expandedView() : _collapsedView());
   }
 }

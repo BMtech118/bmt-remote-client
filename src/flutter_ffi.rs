@@ -980,6 +980,17 @@ pub fn main_get_login_device_info() -> SyncReturn<String> {
     SyncReturn(get_login_device_info_json())
 }
 
+// BMT Remote: Dart exceptions otherwise only reach stdout, which a Finder launch discards.
+pub fn main_log_dart_error(message: String) -> SyncReturn<()> {
+    hbb_common::throttled_log!(
+        std::time::Duration::from_secs(10),
+        error,
+        "[dart] {}",
+        message
+    );
+    SyncReturn(())
+}
+
 pub fn main_change_id(new_id: String) {
     change_id(new_id)
 }

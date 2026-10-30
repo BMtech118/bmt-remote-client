@@ -31,6 +31,7 @@ import 'mobile/widgets/deploy_dialog.dart';
 import 'models/platform_model.dart';
 import 'bmt_checkin.dart';
 import 'bmt_portal_chat.dart';
+import 'bmt_error_log.dart';
 
 /// Basic window and launch properties.
 int? kWindowId;
@@ -40,6 +41,7 @@ late List<String> kBootArgs;
 Future<void> main(List<String> args) async {
   earlyAssert();
   WidgetsFlutterBinding.ensureInitialized();
+  installBmtErrorLog();
 
   debugPrint("launch args: $args");
   kBootArgs = List.from(args);

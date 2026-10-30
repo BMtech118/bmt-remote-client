@@ -791,6 +791,8 @@ class RustdeskImpl {
     throw UnimplementedError("mainGetDefaultSoundInput");
   }
 
+  void mainLogDartError({required String message, dynamic hint}) {}
+
   String mainGetLoginDeviceInfo({dynamic hint}) {
     String userAgent = html.window.navigator.userAgent;
     String appName = html.window.navigator.appName;

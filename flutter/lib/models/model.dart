@@ -1364,7 +1364,11 @@ class FfiModel with ChangeNotifier {
     _pi.username = evt['username'];
     _pi.hostname = evt['hostname'];
     // BMT Remote: the tab can now show the computer's name, even on a first visit.
-    if (isDesktop || isWebDesktop) {
+    // tabLabel is not registered in every window; an unguarded find throws and
+    // aborts peer info before the display size reaches Rust (black screen).
+    if ((isDesktop || isWebDesktop) &&
+        Get.isRegistered<RxString>(
+            tag: PeerStringOption.tag(peerId, 'tabLabel'))) {
       final label = getDesktopTabLabel(peerId,
           bind.mainGetPeerOptionSync(id: peerId, key: 'alias'),
           hostname: _pi.hostname);

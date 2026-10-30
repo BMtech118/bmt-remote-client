@@ -785,9 +785,7 @@ class _RemotePageState extends State<RemotePage>
     }
 
     // BMT Remote: the remote screen makes room for the docked chat panel.
-    // A bare Row defaults to CrossAxisAlignment.center, which leaves the remote
-    // screen unconstrained vertically and collapses it to nothing (black screen).
-    // Stretch so the remote view fills the full height, as it did before docking.
+    // Stretch so the remote view gets the full height, as it did before docking.
     withChatPanel() => Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(child: bodyWidget()),
           Obx(() => _ffi.chatModel.bmtDockOpen.isTrue

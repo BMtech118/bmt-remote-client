@@ -27,6 +27,10 @@ use hbb_common::{
 use std::time::Duration;
 
 const ENROL_URL: &str = "https://remote.bmtech.co.uk/api/enrol";
+/// BMT Remote's own release version (matches flutter/pubspec.yaml). The server
+/// compares it with the published release to decide who needs an update; the
+/// RustDesk core's VERSION can't be used for that.
+pub const BMT_VERSION: &str = "1.0.0";
 const OPT_TOKEN: &str = "bmt-enrol-token";
 /// The token this machine last enrolled with; a different token re-enrols.
 const OPT_ENROLLED: &str = "bmt-enrolled-token";
@@ -240,6 +244,7 @@ async fn post(token: &str, id: &str, password: Option<&str>) -> Result<(u16, Str
         "os": std::env::consts::OS,
         "user": crate::platform::get_active_username(),
         "version": crate::VERSION,
+        "bmt_version": BMT_VERSION,
     });
     if let Some(p) = password {
         body["password"] = p.into();

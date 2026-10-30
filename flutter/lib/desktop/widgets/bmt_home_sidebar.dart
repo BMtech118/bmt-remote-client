@@ -9,6 +9,7 @@ import '../../common.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import 'bmt_toolbar_style.dart';
+import 'bmt_update_card.dart';
 
 class BmtHomeSidebar extends StatelessWidget {
   final VoidCallback onSettings;
@@ -126,6 +127,7 @@ class BmtHomeSidebar extends StatelessWidget {
                     const SizedBox(height: 8),
                     Consumer<ServerModel>(
                         builder: (context, model, _) => _card(context, model)),
+                    const BmtUpdateCard(),
                     const SizedBox(height: 8),
                     cards,
                   ]),

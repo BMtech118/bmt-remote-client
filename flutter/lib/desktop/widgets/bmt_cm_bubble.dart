@@ -21,8 +21,6 @@ class BmtCmBubble {
   static final expanded = true.obs;
   static final tab = 'session'.obs;
   static final Map<int, DateTime> _since = {};
-  // Once the customer drags it somewhere, keep it there.
-  static bool _moved = false;
 
   static const _collapsed = Size(272, 56);
   static const _panelWidth = 380.0;
@@ -39,30 +37,27 @@ class BmtCmBubble {
   /// Puts the window where the bubble or panel belongs. Called whenever the
   /// window is shown again, so the upstream size and position don't win.
   static Future<void> reapply() async {
-    if (showing.value) await _apply();
+    if (showing.value) await _applySettled();
   }
 
   static Future<void> _apply() async {
-    // The connection window is briefly minimised whenever it is shown; a
-    // resize on its own leaves it parked off-screen, so restore it first.
+    // Always pinned to the middle of the right-hand edge, open or collapsed
+    // (Mace, 30 Oct 2026). The connection window is briefly minimised
+    // whenever it is shown; a resize on its own leaves it off-screen.
     if (await windowManager.isMinimized()) await windowManager.restore();
-    if (_moved) {
-      await windowManager.setSize(expanded.value
-          ? Size(_panelWidth, tab.value == 'chat' ? 600 : 560)
-          : _collapsed);
-    } else if (expanded.value) {
-      await windowManager.setSizeAlignment(
-          Size(_panelWidth, tab.value == 'chat' ? 600 : 560),
-          Alignment.topRight);
-    } else {
-      await windowManager.setSizeAlignment(_collapsed, Alignment.centerRight);
-    }
+    final size = expanded.value
+        ? Size(_panelWidth, tab.value == 'chat' ? 600 : 560)
+        : _collapsed;
+    await windowManager.setSizeAlignment(size, Alignment.centerRight);
     if (!await windowManager.isVisible()) await windowManager.show();
   }
 
-  static void startDrag() {
-    _moved = true;
-    windowManager.startDragging();
+  /// Applies the position now and again shortly after, because the upstream
+  /// window code can still be moving the window when it is first shown.
+  static Future<void> _applySettled() async {
+    await _apply();
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (showing.value) await _apply();
   }
 
   static void open(String which) {
@@ -94,12 +89,14 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
     BmtCmBubble.tab.value = 'session';
     // Start as the small tab on the screen edge; the customer opens it.
     BmtCmBubble.expanded.value = false;
-    _workers.add(ever(BmtCmBubble.expanded, (_) => BmtCmBubble._apply()));
+    _workers
+        .add(ever(BmtCmBubble.expanded, (_) => BmtCmBubble._applySettled()));
     _workers.add(ever(BmtCmBubble.tab, (t) {
       if (t == 'chat') _focusChat();
       BmtCmBubble._apply();
     }));
-    WidgetsBinding.instance.addPostFrameCallback((_) => BmtCmBubble._apply());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => BmtCmBubble._applySettled());
   }
 
   @override
@@ -182,55 +179,54 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
       color: BmtTabBar.navy,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onPanStart: (_) => BmtCmBubble.startDrag(),
         child: Row(children: [
-        InkWell(
-          onTap: () => BmtCmBubble.open('session'),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 8, 0),
-            child: BmtTb.icon('caret-left', const Color(0xff7d8ba3), size: 14),
-          ),
-        ),
-        Expanded(
-          child: InkWell(
+          InkWell(
             onTap: () => BmtCmBubble.open('session'),
-            child: Row(children: [
-              _avatar(32, BmtTabBar.navy),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_name,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Color(0xffeef2f8),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13)),
-                      const Text('BM Technologies',
-                          style: TextStyle(
-                              color: Color(0xff7d8ba3), fontSize: 11.5)),
-                    ]),
-              ),
-            ]),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 8, 0),
+              child:
+                  BmtTb.icon('caret-left', const Color(0xff7d8ba3), size: 14),
+            ),
           ),
-        ),
-        Container(
-            width: 1, height: 24, color: const Color(0xff243652)),
-        const SizedBox(width: 4),
-        Obx(() => _iconButton('chat-circle-text', translate('Chat'),
-            () => BmtCmBubble.open('chat'),
-            badge: _client.unreadChatMessageCount.value > 0
-                ? Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                        color: Color(0xff4d8dff), shape: BoxShape.circle))
-                : null)),
-        _iconButton('x', translate('End session'), _endSession),
-        const SizedBox(width: 6),
-      ]),
+          Expanded(
+            child: InkWell(
+              onTap: () => BmtCmBubble.open('session'),
+              child: Row(children: [
+                _avatar(32, BmtTabBar.navy),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Color(0xffeef2f8),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13)),
+                        const Text('BM Technologies',
+                            style: TextStyle(
+                                color: Color(0xff7d8ba3), fontSize: 11.5)),
+                      ]),
+                ),
+              ]),
+            ),
+          ),
+          Container(width: 1, height: 24, color: const Color(0xff243652)),
+          const SizedBox(width: 4),
+          Obx(() => _iconButton('chat-circle-text', translate('Chat'),
+              () => BmtCmBubble.open('chat'),
+              badge: _client.unreadChatMessageCount.value > 0
+                  ? Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                          color: Color(0xff4d8dff), shape: BoxShape.circle))
+                  : null)),
+          _iconButton('x', translate('End session'), _endSession),
+          const SizedBox(width: 6),
+        ]),
       ),
     );
   }
@@ -326,35 +322,42 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
 
   Widget _sessionTab() {
     final c = _client;
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), children: [
-      Text('$_name can',
-          style: const TextStyle(
-              color: BmtTb.ink3, fontSize: 11, fontWeight: FontWeight.w500)),
-      const SizedBox(height: 4),
-      _perm('eye', 'See your screen', null, ''),
-      _perm('mouse', 'Use your mouse and keyboard', c.keyboard, 'keyboard'),
-      _perm('clipboard-text', 'Use your clipboard', c.clipboard, 'clipboard'),
-      _perm('folder-simple-dashed', 'Send and receive files', c.file, 'file'),
-      _perm('speaker-high', "Hear your computer's sound", c.audio, 'audio'),
-      _perm('arrows-clockwise', 'Restart this computer', c.restart, 'restart'),
-      const SizedBox(height: 8),
-      Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-            color: const Color(0xfff4f5f7),
-            borderRadius: BorderRadius.circular(10)),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          BmtTb.icon('info', BmtTb.blue, size: 16),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-                'You can end the session at any time. $_name will be disconnected straight away.',
-                style: const TextStyle(
-                    color: BmtTb.ink2, fontSize: 12, height: 1.45)),
+    return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        children: [
+          Text('$_name can',
+              style: const TextStyle(
+                  color: BmtTb.ink3,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 4),
+          _perm('eye', 'See your screen', null, ''),
+          _perm('mouse', 'Use your mouse and keyboard', c.keyboard, 'keyboard'),
+          _perm(
+              'clipboard-text', 'Use your clipboard', c.clipboard, 'clipboard'),
+          _perm(
+              'folder-simple-dashed', 'Send and receive files', c.file, 'file'),
+          _perm('speaker-high', "Hear your computer's sound", c.audio, 'audio'),
+          _perm('arrows-clockwise', 'Restart this computer', c.restart,
+              'restart'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: const Color(0xfff4f5f7),
+                borderRadius: BorderRadius.circular(10)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              BmtTb.icon('info', BmtTb.blue, size: 16),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                    'You can end the session at any time. $_name will be disconnected straight away.',
+                    style: const TextStyle(
+                        color: BmtTb.ink2, fontSize: 12, height: 1.45)),
+              ),
+            ]),
           ),
-        ]),
-      ),
-    ]);
+        ]);
   }
 
   Widget _footerButton(String icon, String label, VoidCallback onTap,
@@ -393,41 +396,42 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
       child: Column(children: [
         GestureDetector(
           behavior: HitTestBehavior.translucent,
-          onPanStart: (_) => BmtCmBubble.startDrag(),
           child: Container(
-          color: BmtTabBar.navy,
-          padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
-          child: Row(children: [
-            _avatar(40, BmtTabBar.navy),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('$_name is connected',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: Color(0xffeef2f8),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.5)),
-                const SizedBox(height: 2),
-                Text('BM Technologies support · since $hhmm',
-                    style: const TextStyle(
-                        color: Color(0xff8a98b0), fontSize: 12)),
-              ]),
-            ),
-            Tooltip(
-              message: translate('Minimize'),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => BmtCmBubble.expanded.value = false,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: BmtTb.icon('caret-down', const Color(0xff8a98b0),
-                      size: 16),
+            color: BmtTabBar.navy,
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+            child: Row(children: [
+              _avatar(40, BmtTabBar.navy),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$_name is connected',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Color(0xffeef2f8),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14.5)),
+                      const SizedBox(height: 2),
+                      Text('BM Technologies support · since $hhmm',
+                          style: const TextStyle(
+                              color: Color(0xff8a98b0), fontSize: 12)),
+                    ]),
+              ),
+              Tooltip(
+                message: translate('Minimize'),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => BmtCmBubble.expanded.value = false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: BmtTb.icon('caret-down', const Color(0xff8a98b0),
+                        size: 16),
+                  ),
                 ),
               ),
-            ),
-          ]),
-        ),
+            ]),
+          ),
         ),
         Container(
           padding: const EdgeInsets.only(left: 8),
@@ -464,7 +468,7 @@ class _BmtCmBubbleViewState extends State<BmtCmBubbleView> {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() =>
-        BmtCmBubble.expanded.value ? _expandedView() : _collapsedView());
+    return Obx(
+        () => BmtCmBubble.expanded.value ? _expandedView() : _collapsedView());
   }
 }

@@ -76,7 +76,17 @@ class ChatModel with ChangeNotifier {
     }
     bmtDockTab.value = tab;
     bmtDockOpen.value = true;
+    _bmtUseSessionChat();
     if (tab == 'chat') requestChatInputFocus();
+  }
+
+  // The dock shows this session's conversation. Without this the key stays
+  // invalid: sends go nowhere and replies land in a conversation not shown.
+  void _bmtUseSessionChat() {
+    final id = parent.target?.id;
+    if (id == null || id.isEmpty) return;
+    final key = MessageKey(id, clientModeID);
+    if (_currentKey != key) changeCurrentKey(key);
   }
 
   RxBool isWindowFocus = true.obs;
@@ -216,6 +226,7 @@ class ChatModel with ChangeNotifier {
     if (_bmtDocked) {
       bmtDockTab.value = 'chat';
       bmtDockOpen.value = true;
+      _bmtUseSessionChat();
       requestChatInputFocus();
       return;
     }

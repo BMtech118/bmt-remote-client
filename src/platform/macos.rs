@@ -302,8 +302,19 @@ fn update_daemon_agent(agent_plist_file: String, update_source_dir: String, sync
     }
 }
 
+/// The macOS app bundle and executable name ("BMT Remote"). The structural
+/// app name ("BMT-Remote") stays in service labels and preference domains;
+/// paths to the app use the bundle name, or the services point at an app that
+/// doesn't exist (CC-1298).
+fn bundle_name() -> String {
+    crate::get_app_display_name()
+}
+
 fn correct_app_name(s: &str) -> String {
     let mut s = s.to_owned();
+    // Paths first, before the generic RustDesk -> app name swap below.
+    s = s.replace("RustDesk.app/Contents/MacOS/RustDesk", &format!("{0}.app/Contents/MacOS/{0}", bundle_name()));
+    s = s.replace("RustDesk.app", &format!("{}.app", bundle_name()));
     if let Some(bundleid) = get_bundle_id() {
         s = s.replace("com.carriez.rustdesk", &bundleid);
     }
@@ -406,7 +417,7 @@ pub fn uninstall_service(show_new_window: bool, sync: bool) -> bool {
                     if show_new_window {
                         std::process::Command::new("open")
                             .arg("-n")
-                            .arg(&format!("/Applications/{}.app", crate::get_app_name()))
+                            .arg(&format!("/Applications/{}.app", bundle_name()))
                             .spawn()
                             .ok();
                         // leave open a little time
@@ -871,7 +882,7 @@ pub fn is_installed() -> bool {
         return p
             .to_str()
             .unwrap_or_default()
-            .starts_with(&format!("/Applications/{}.app", crate::get_app_name()));
+            .starts_with(&format!("/Applications/{}.app", bundle_name()));
     }
     false
 }
@@ -910,7 +921,7 @@ pub fn update_me() -> ResultType<()> {
         bail!("Unknown app directory of current exe file: {:?}", cmd);
     };
 
-    let app_name = crate::get_app_name();
+    let app_name = bundle_name();
     if is_installed_daemon && !is_service_stopped {
         let agent = format!("{}_server.plist", crate::get_full_name());
         let agent_plist_file = format!("/Library/LaunchAgents/{}", agent);
@@ -1037,11 +1048,11 @@ fn validate_update_tree(path: &Path, framework_root: Option<&Path>) -> ResultTyp
 /// Performs a silent update from a DMG file without any osascript dialog.
 /// Must be called from a process running as root (e.g. the service binary).
 pub fn update_from_dmg_as_root(dmg_path: &str, expected_version: &str) -> ResultType<()> {
-    let app_name = crate::get_app_name();
+    let app_name = bundle_name();
     if app_name.is_empty()
         || !app_name
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b' '))
     {
         bail!("[root-update] unsafe application name");
     }
@@ -1473,7 +1484,7 @@ stop_daemon() {{
     return 1
 }}
 write_new_plists() {{
-    /Applications/{app_name}.app/Contents/MacOS/service --write-plists \
+    "/Applications/{app_name}.app/Contents/MacOS/service" --write-plists \
         >"{tmp_dir}/write-plists.log" 2>&1 &
     write_pid=$!
     for _ in $(/usr/bin/seq 1 60); do
@@ -1593,35 +1604,35 @@ if [ ! -d "$staged_bundle/Contents/MacOS" ] || \
     rm -rf "$staged_bundle"
     exit 1
 fi
-if ! mv {app_bundle} {app_bundle}.bak; then
+if ! mv "{app_bundle}" "{app_bundle}.bak"; then
     echo "[root-update] backup mv failed, aborting" >> {tmp_dir}/rustdesk_root_update.log
     rm -rf "$staged_bundle"
     exit 1
 fi
 bundle_swapped=1
-if ! mv "$staged_bundle" {app_bundle}; then
+if ! mv "$staged_bundle" "{app_bundle}"; then
     echo "[root-update] replacement mv failed, restoring backup" >> {tmp_dir}/rustdesk_root_update.log
     exit 1
 fi
 # Install the entire bundle as root-owned.  The LaunchDaemon executes code
 # from this bundle, so no nested framework, helper, or resource may remain
 # user-writable.
-if ! chown -R root:wheel {app_bundle} || ! chmod -R go-w {app_bundle}; then
+if ! chown -R root:wheel "{app_bundle}" || ! chmod -R go-w "{app_bundle}"; then
     echo "[root-update] chown failed, restoring backup" >> {tmp_dir}/rustdesk_root_update.log
     exit 1
 fi
-xattr -r -d com.apple.quarantine {app_bundle} || true
+xattr -r -d com.apple.quarantine "{app_bundle}" || true
 # Keep root-executed files AND entire ancestor chain root-owned — prevent privilege escalation
-if ! chown root:wheel {app_bundle} || \
-   ! chmod 755 {app_bundle} || \
-   ! chown root:wheel {app_bundle}/Contents || \
-   ! chmod 755 {app_bundle}/Contents || \
-   ! chown root:wheel {app_bundle}/Contents/MacOS || \
-   ! chmod 755 {app_bundle}/Contents/MacOS || \
-   ! chown root:wheel {app_bundle}/Contents/MacOS/service || \
-   ! chmod 755 {app_bundle}/Contents/MacOS/service || \
-   ! chown root:wheel {app_bundle}/Contents/MacOS/{app_name} || \
-   ! chmod 755 {app_bundle}/Contents/MacOS/{app_name}; then
+if ! chown root:wheel "{app_bundle}" || \
+   ! chmod 755 "{app_bundle}" || \
+   ! chown root:wheel "{app_bundle}/Contents" || \
+   ! chmod 755 "{app_bundle}/Contents" || \
+   ! chown root:wheel "{app_bundle}/Contents/MacOS" || \
+   ! chmod 755 "{app_bundle}/Contents/MacOS" || \
+   ! chown root:wheel "{app_bundle}/Contents/MacOS/service" || \
+   ! chmod 755 "{app_bundle}/Contents/MacOS/service" || \
+   ! chown root:wheel "{app_bundle}/Contents/MacOS/"{app_name} || \
+   ! chmod 755 "{app_bundle}/Contents/MacOS/"{app_name}; then
     echo "[root-update] hardening failed, restoring backup" >> {tmp_dir}/rustdesk_root_update.log
     exit 1
 fi
@@ -1802,7 +1813,7 @@ fn extract_dmg_inner(dmg_path: &str, target_dir: &str) -> ResultType<()> {
     }
     let _guard = DmgGuard(mount_point.clone());
 
-    let app_name = format!("{}.app", crate::get_app_name());
+    let app_name = format!("{}.app", bundle_name());
     let src_path = format!("{}/{}", mount_point, app_name);
     let dest_path = format!("{}/{}", target_dir, app_name);
 
@@ -1830,7 +1841,7 @@ fn extract_dmg_inner(dmg_path: &str, target_dir: &str) -> ResultType<()> {
 }
 
 fn update_extracted(target_dir: &str) -> ResultType<()> {
-    let app_name = crate::get_app_name();
+    let app_name = bundle_name();
     let exe_path = format!(
         "{}/{}.app/Contents/MacOS/{}",
         target_dir, app_name, app_name
